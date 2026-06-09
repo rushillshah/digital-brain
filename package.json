@@ -4,7 +4,7 @@
   "description": "Your private digital imprint for AI assistants.",
   "type": "module",
   "bin": {
-    "digital-brain": "./bin/digital-brain.js"
+    "digital-brain": "bin/digital-brain.js"
   },
   "files": [
     "bin",
