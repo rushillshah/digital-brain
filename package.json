@@ -31,7 +31,7 @@
     "local-first",
     "context"
   ],
-  "author": "Rushil Shah",
+  "author": "Rushill Shah",
   "license": "MIT",
   "engines": {
     "node": ">=20"
