@@ -1,0 +1,109 @@
+[
+  {
+    "chatName": "Mom",
+    "messageCount": 2,
+    "inbound": 1,
+    "outbound": 1,
+    "outboundShare": 0.5,
+    "firstSeen": "2026-01-01",
+    "lastSeen": "2026-01-01",
+    "isGroup": false,
+    "sentimentScore": 0.159,
+    "warmthScore": 0.5,
+    "frictionScore": 0.0,
+    "operationalScore": 1.5,
+    "questionCount": 0,
+    "relationshipGuess": "warm personal relationship",
+    "tags": [
+      "direct-chat",
+      "light",
+      "warm",
+      "logistics-heavy"
+    ],
+    "role": "mother",
+    "roleConfidence": "high",
+    "roleReason": "manual override",
+    "closeness": "medium",
+    "conversationDifficulty": "low",
+    "reciprocity": "balanced",
+    "howToContinue": [
+      "Use warmer language than a work chat.",
+      "Do not make the interaction purely transactional.",
+      "Track open loops, plans, dates, and commitments."
+    ],
+    "boundaries": [
+      "Do not expose private summaries unless asked."
+    ]
+  },
+  {
+    "chatName": "Project Team",
+    "messageCount": 2,
+    "inbound": 1,
+    "outbound": 1,
+    "outboundShare": 0.5,
+    "firstSeen": "2026-01-01",
+    "lastSeen": "2026-01-01",
+    "isGroup": true,
+    "sentimentScore": 0,
+    "warmthScore": 0.0,
+    "frictionScore": 0.0,
+    "operationalScore": 3.0,
+    "questionCount": 1,
+    "relationshipGuess": "group, likely social or mixed context",
+    "tags": [
+      "group-chat",
+      "light",
+      "logistics-heavy",
+      "question-heavy"
+    ],
+    "role": "work collaborator",
+    "roleConfidence": "medium",
+    "roleReason": "matched chat name",
+    "closeness": "low/unclear",
+    "conversationDifficulty": "practical/low-emotional",
+    "reciprocity": "balanced",
+    "howToContinue": [
+      "Lead with context, next steps, and clear asks.",
+      "Keep emotional interpretation light.",
+      "Track open loops, plans, dates, and commitments."
+    ],
+    "boundaries": [
+      "Do not expose private summaries unless asked."
+    ]
+  },
+  {
+    "chatName": "Close Friend",
+    "messageCount": 2,
+    "inbound": 1,
+    "outbound": 1,
+    "outboundShare": 0.5,
+    "firstSeen": "2026-01-01",
+    "lastSeen": "2026-01-01",
+    "isGroup": false,
+    "sentimentScore": 0.159,
+    "warmthScore": 1.0,
+    "frictionScore": 0.0,
+    "operationalScore": 0.5,
+    "questionCount": 0,
+    "relationshipGuess": "warm personal relationship",
+    "tags": [
+      "direct-chat",
+      "light",
+      "warm",
+      "logistics-heavy"
+    ],
+    "role": "operational contact",
+    "roleConfidence": "low",
+    "roleReason": "logistics-heavy communication",
+    "closeness": "medium",
+    "conversationDifficulty": "low",
+    "reciprocity": "balanced",
+    "howToContinue": [
+      "Keep tone neutral until the user labels this relationship.",
+      "Track open loops, plans, dates, and commitments."
+    ],
+    "boundaries": [
+      "Do not expose private summaries unless asked."
+    ]
+  }
+]

@@ -1,0 +1,6 @@
+{"id":"sample-1","source":"sample","timestamp":"2026-01-01T10:00:00+00:00","chatName":"Mom","isGroup":false,"fromMe":false,"author":"Mom","body":"Good morning, call me when you wake up"}
+{"id":"sample-2","source":"sample","timestamp":"2026-01-01T10:05:00+00:00","chatName":"Mom","isGroup":false,"fromMe":true,"author":"Me","body":"Morning, will call in 10"}
+{"id":"sample-3","source":"sample","timestamp":"2026-01-01T11:00:00+00:00","chatName":"Project Team","isGroup":true,"fromMe":false,"author":"Alex","body":"Can you send the deck before the client meeting?"}
+{"id":"sample-4","source":"sample","timestamp":"2026-01-01T11:03:00+00:00","chatName":"Project Team","isGroup":true,"fromMe":true,"author":"Me","body":"Yes, sending the updated deck now"}
+{"id":"sample-5","source":"sample","timestamp":"2026-01-01T20:00:00+00:00","chatName":"Close Friend","isGroup":false,"fromMe":false,"author":"Friend","body":"That was fun haha, let's plan another trip"}
+{"id":"sample-6","source":"sample","timestamp":"2026-01-01T20:02:00+00:00","chatName":"Close Friend","isGroup":false,"fromMe":true,"author":"Me","body":"Yes absolutely, that was great"}

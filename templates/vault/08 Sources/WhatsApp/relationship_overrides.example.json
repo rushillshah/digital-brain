@@ -1,0 +1,8 @@
+{
+  "Mom": {
+    "role": "mother",
+    "confidence": "high",
+    "notes": "Example only. Copy to relationship_overrides.json and edit."
+  }
+}
+

@@ -1,0 +1,99 @@
+import fs from "node:fs";
+import path from "node:path";
+import qrcode from "qrcode-terminal";
+import pkg from "whatsapp-web.js";
+
+const { Client, LocalAuth } = pkg;
+const args = parseArgs(process.argv.slice(2));
+
+if (!args.vault || !args.to || !args.message) usage();
+
+const vault = path.resolve(args.vault);
+const whatsAppDir = path.join(vault, "08 Sources", "WhatsApp");
+const outboundDir = path.join(whatsAppDir, "Outbound");
+const sessionDir = path.join(whatsAppDir, ".session");
+fs.mkdirSync(outboundDir, { recursive: true });
+
+if (!args.yes) {
+  console.log("Draft only. Nothing sent.");
+  console.log(`To: ${args.to}`);
+  console.log(`Message: ${args.message}`);
+  console.log("Re-run with --yes to send.");
+  process.exit(2);
+}
+
+const client = new Client({
+  authStrategy: new LocalAuth({ clientId: "selfprint", dataPath: sessionDir }),
+  puppeteer: { headless: false, args: ["--no-sandbox", "--disable-setuid-sandbox"] },
+});
+
+client.on("qr", (qr) => {
+  console.log("Scan this QR in WhatsApp > Linked devices:");
+  qrcode.generate(qr, { small: true });
+});
+
+client.on("ready", async () => {
+  try {
+    const chat = await resolveChat(args.to);
+    const sent = await chat.sendMessage(args.message);
+    const record = {
+      timestamp: new Date().toISOString(),
+      to: args.to,
+      resolvedChatName: chatName(chat),
+      message: args.message,
+      messageId: sent.id?._serialized || null,
+    };
+    fs.appendFileSync(path.join(outboundDir, "sent.jsonl"), `${JSON.stringify(record)}\n`);
+    fs.appendFileSync(path.join(outboundDir, "Sent.md"), `- ${record.timestamp} | ${record.resolvedChatName}: ${record.message}\n`);
+    console.log(`Sent to ${record.resolvedChatName}`);
+    await client.destroy();
+    process.exit(0);
+  } catch (error) {
+    console.error(`Send failed: ${error.message}`);
+    await client.destroy();
+    process.exit(1);
+  }
+});
+
+client.initialize();
+
+async function resolveChat(target) {
+  const number = normalizePhone(target);
+  if (number) {
+    const id = await client.getNumberId(number);
+    if (!id) throw new Error(`No WhatsApp account found for phone ${target}`);
+    return await client.getChatById(id._serialized);
+  }
+  const chats = await client.getChats();
+  const matches = chats.filter((chat) => chatName(chat).toLowerCase().includes(target.toLowerCase()));
+  if (matches.length === 0) throw new Error(`No chat matched "${target}"`);
+  if (matches.length > 1) throw new Error(`Multiple chats matched "${target}": ${matches.slice(0, 10).map(chatName).join(", ")}`);
+  return matches[0];
+}
+
+function normalizePhone(input) {
+  if (!input.startsWith("+") && !/^\d{8,}$/.test(input)) return "";
+  return input.replace(/[^\d]/g, "");
+}
+
+function chatName(chat) {
+  return chat.name || chat.formattedTitle || chat.id?._serialized || "Unknown Chat";
+}
+
+function parseArgs(argv) {
+  const out = { yes: false };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--yes") out.yes = true;
+    else if (arg.startsWith("--")) {
+      const key = arg.slice(2);
+      out[key] = argv[++i] || "";
+    }
+  }
+  return out;
+}
+
+function usage() {
+  console.error('Usage: selfprint send-whatsapp --vault <path> --to "Name" --message "Text" [--yes]');
+  process.exit(1);
+}

@@ -1,0 +1,68 @@
+[
+  {
+    "chatName": "Mom",
+    "messageCount": 2,
+    "inbound": 1,
+    "outbound": 1,
+    "outboundShare": 0.5,
+    "firstSeen": "2026-01-01",
+    "lastSeen": "2026-01-01",
+    "isGroup": false,
+    "sentimentScore": 0.159,
+    "warmthScore": 0.5,
+    "frictionScore": 0.0,
+    "operationalScore": 1.5,
+    "questionCount": 0,
+    "relationshipGuess": "warm personal relationship",
+    "tags": [
+      "direct-chat",
+      "light",
+      "warm",
+      "logistics-heavy"
+    ]
+  },
+  {
+    "chatName": "Project Team",
+    "messageCount": 2,
+    "inbound": 1,
+    "outbound": 1,
+    "outboundShare": 0.5,
+    "firstSeen": "2026-01-01",
+    "lastSeen": "2026-01-01",
+    "isGroup": true,
+    "sentimentScore": 0,
+    "warmthScore": 0.0,
+    "frictionScore": 0.0,
+    "operationalScore": 3.0,
+    "questionCount": 1,
+    "relationshipGuess": "group, likely social or mixed context",
+    "tags": [
+      "group-chat",
+      "light",
+      "logistics-heavy",
+      "question-heavy"
+    ]
+  },
+  {
+    "chatName": "Close Friend",
+    "messageCount": 2,
+    "inbound": 1,
+    "outbound": 1,
+    "outboundShare": 0.5,
+    "firstSeen": "2026-01-01",
+    "lastSeen": "2026-01-01",
+    "isGroup": false,
+    "sentimentScore": 0.159,
+    "warmthScore": 1.0,
+    "frictionScore": 0.0,
+    "operationalScore": 0.5,
+    "questionCount": 0,
+    "relationshipGuess": "warm personal relationship",
+    "tags": [
+      "direct-chat",
+      "light",
+      "warm",
+      "logistics-heavy"
+    ]
+  }
+]

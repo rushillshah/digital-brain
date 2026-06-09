@@ -1,0 +1,43 @@
+{
+  "name": "selfprint",
+  "version": "0.1.0",
+  "description": "A local-first personal context layer for AI assistants.",
+  "type": "module",
+  "bin": {
+    "selfprint": "./bin/selfprint.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "scripts/*.py",
+    "templates",
+    "whatsapp-web",
+    "examples",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+    "scripts": {
+    "test:sample": "node ./bin/selfprint.js extract --vault ./examples/sample-vault --days 365 --min-messages 1 && node ./bin/selfprint.js interpret --vault ./examples/sample-vault --days 365",
+    "check": "node --check bin/selfprint.js && node --check lib/*.js && node --check whatsapp-web/*.mjs && python3 -m py_compile scripts/*.py",
+    "start": "node ./bin/selfprint.js"
+  },
+  "keywords": [
+    "ai",
+    "memory",
+    "personal-ai",
+    "obsidian",
+    "whatsapp",
+    "local-first",
+    "context"
+  ],
+  "author": "Rushil Shah",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.7"
+  }
+}
