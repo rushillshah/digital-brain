@@ -10,6 +10,14 @@ Tools/digital-brain-refresh.sh
 
 That script runs sync, extract, and interpret using the install-time config.
 
+After setup, the normal manual command is:
+
+```bash
+digital-brain run
+```
+
+`init` saves your default vault in `~/.digital-brain/config.json`, so `run` does not need a vault path.
+
 ## Configurable At Install
 
 `digital-brain init` asks:
@@ -64,7 +72,7 @@ Use a Codex cron automation pointed at the generated vault.
 Prompt:
 
 ```text
-Run `Tools/digital-brain-refresh.sh`. Verify completion and report only counts plus output paths. Do not print private message contents.
+Run `digital-brain run`. Verify completion and report only counts plus output paths. Do not print private message contents.
 ```
 
 Example schedule ideas:

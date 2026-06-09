@@ -77,11 +77,19 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 ## Core Commands
 
 ```bash
-digital-brain init ./Digital Brain\ Vault
-digital-brain sync-whatsapp --vault ./Digital Brain\ Vault --days 30
-digital-brain extract --vault ./Digital Brain\ Vault --days 30
-digital-brain interpret --vault ./Digital Brain\ Vault --days 30
-digital-brain send-whatsapp --vault ./Digital Brain\ Vault --to "Name" --message "text"
+digital-brain init
+digital-brain run
+digital-brain send-whatsapp --to "Name" --message "text"
+```
+
+`init` remembers your vault globally, so `run` works from anywhere. `run` syncs WhatsApp, extracts relationships, and writes interpreted memory in one command.
+
+The lower-level commands still exist for debugging:
+
+```bash
+digital-brain sync-whatsapp
+digital-brain extract
+digital-brain interpret
 ```
 
 The sender drafts by default. Add `--yes` to actually send.

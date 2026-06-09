@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
-import { copyDir, ensureDir, packageRoot, resolveVault } from "../lib/fs.js";
+import { copyDir, ensureDir, packageRoot, resolveVault, writeDefaultVault } from "../lib/fs.js";
 
 const root = packageRoot(import.meta.url);
 
@@ -19,6 +19,7 @@ async function main() {
   const args = parseArgs(argv);
 
   if (command === "init") await init(argv, args);
+  else if (command === "run" || command === "refresh") runRefresh(argv, args);
   else if (command === "doctor") doctor();
   else if (command === "sync-whatsapp") runPython("digital_brain_whatsapp_mac_sync.py", argv);
   else if (command === "extract") runPython("digital_brain_relationship_extractor.py", argv);
@@ -121,6 +122,7 @@ async function init(argv, args) {
     },
   };
   writeConfig(vault, config);
+  writeDefaultVault(vault);
   writeRefreshScript(vault, config);
   writeWatchScript(vault, config);
 
@@ -132,12 +134,11 @@ async function init(argv, args) {
 
   console.log(`Digital Brain vault created: ${vault}`);
   console.log(`Config: ${path.join(vault, "digital-brain.config.json")}`);
+  console.log(`Default vault saved: ${vault}`);
   console.log(`Refresh script: ${path.join(vault, "Tools", "digital-brain-refresh.sh")}`);
   console.log(`Always-on script: ${path.join(vault, "Tools", "digital-brain-watch.sh")}`);
   console.log("Next:");
-  console.log(`  digital-brain sync-whatsapp --vault "${vault}" --days ${dataWindowDays}`);
-  console.log(`  digital-brain extract --vault "${vault}" --days ${dataWindowDays}`);
-  console.log(`  digital-brain interpret --vault "${vault}" --days ${dataWindowDays}`);
+  console.log("  digital-brain run");
   if (schedule === "always-on") console.log(`  "${path.join(vault, "Tools", "digital-brain-watch.sh")}"`);
 }
 
@@ -156,19 +157,62 @@ function doctor() {
 }
 
 function runPython(script, argv) {
-  const resolved = withVault(argv);
-  const result = spawnSync("python3", [path.join(root, "scripts", script), ...resolved], { stdio: "inherit" });
+  const result = runPythonStep(script, withVault(argv));
   process.exit(result.status ?? 1);
 }
 
+function runRefresh(argv, args) {
+  const vault = getVaultFromArgs(argv);
+  const config = readVaultConfig(vault);
+  const days = String(args.days || args["data-window-days"] || config.dataWindowDays || 30);
+  const syncArgs = ["--vault", vault, "--days", days, "--markdown-mode", args["markdown-mode"] || "month"];
+  const extractArgs = ["--vault", vault, "--days", days];
+  const interpretArgs = ["--vault", vault, "--days", days];
+  if (args["min-messages"]) extractArgs.push("--min-messages", String(args["min-messages"]));
+  console.log(`Digital Brain refresh: ${vault}`);
+  for (const [label, script, stepArgs] of [
+    ["sync", "digital_brain_whatsapp_mac_sync.py", syncArgs],
+    ["extract", "digital_brain_relationship_extractor.py", extractArgs],
+    ["interpret", "digital_brain_relationship_interpreter.py", interpretArgs],
+  ]) {
+    if (toBoolean(args[`skip-${label}`])) {
+      console.log(`\n→ ${label} skipped`);
+      continue;
+    }
+    console.log(`\n→ ${label}`);
+    const result = runPythonStep(script, stepArgs);
+    if ((result.status ?? 1) !== 0) process.exit(result.status ?? 1);
+  }
+  console.log("\nDigital Brain refresh complete.");
+}
+
+function runPythonStep(script, argv) {
+  return spawnSync("python3", [path.join(root, "scripts", script), ...argv], { stdio: "inherit" });
+}
+
 function runNode(script, argv) {
-  const result = spawnSync(process.execPath, [path.join(root, script), ...argv], { stdio: "inherit" });
+  const result = spawnSync(process.execPath, [path.join(root, script), ...withVault(argv)], { stdio: "inherit" });
   process.exit(result.status ?? 1);
 }
 
 function withVault(argv) {
   if (argv.includes("--vault") || argv.some((arg) => arg.startsWith("--vault="))) return argv;
-  return ["--vault", resolveVault(process.cwd()), ...argv];
+  return ["--vault", getVaultFromArgs(argv), ...argv];
+}
+
+function getVaultFromArgs(argv) {
+  const args = parseArgs(argv);
+  if (args.vault) return path.resolve(String(args.vault));
+  return resolveVault(process.cwd());
+}
+
+function readVaultConfig(vault) {
+  const file = path.join(vault, "digital-brain.config.json");
+  if (!fs.existsSync(file)) {
+    console.error(`No Digital Brain vault found. Run "digital-brain init" first, or pass --vault <path>.`);
+    process.exit(1);
+  }
+  return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
 function writeConfig(vault, config) {
@@ -185,9 +229,7 @@ set -euo pipefail
 VAULT="${vault.replace(/"/g, '\\"')}"
 DAYS="${days}"
 
-digital-brain sync-whatsapp --vault "$VAULT" --days "$DAYS" --markdown-mode month
-digital-brain extract --vault "$VAULT" --days "$DAYS"
-digital-brain interpret --vault "$VAULT" --days "$DAYS"
+digital-brain run --vault "$VAULT" --days "$DAYS" --markdown-mode month
 
 echo "Digital Brain refresh complete for $VAULT"
 `;
@@ -353,10 +395,11 @@ function help() {
 
 Usage:
   digital-brain init [vault]
+  digital-brain run
   digital-brain doctor
-  digital-brain sync-whatsapp --vault <path> --days 30
-  digital-brain extract --vault <path> --days 30
-  digital-brain interpret --vault <path> --days 30
-  digital-brain send-whatsapp --vault <path> --to "Name" --message "Text" [--yes]
+  digital-brain sync-whatsapp --days 30
+  digital-brain extract --days 30
+  digital-brain interpret --days 30
+  digital-brain send-whatsapp --to "Name" --message "Text" [--yes]
 `);
 }

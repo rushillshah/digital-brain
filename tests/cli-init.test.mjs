@@ -12,6 +12,7 @@ const cli = path.join(repo, "bin", "digital-brain.js");
 test("init writes configured vault files and scripts", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
+  const home = testHome(root);
   run([
     cli,
     "init",
@@ -32,7 +33,7 @@ test("init writes configured vault files and scripts", () => {
     "--outbound-mode",
     "draft",
     "--connect-ai=false",
-  ]);
+  ], { HOME: home });
 
   const config = readJson(path.join(vault, "digital-brain.config.json"));
   assert.equal(config.selfName, "Test User");
@@ -48,7 +49,9 @@ test("init writes configured vault files and scripts", () => {
   assert.equal(config.disclosureRule.discloseAfterAiAssistedSends, 2);
 
   assert.match(read(path.join(vault, "Tools", "digital-brain-refresh.sh")), /--days "\$DAYS"/);
+  assert.match(read(path.join(vault, "Tools", "digital-brain-refresh.sh")), /digital-brain run/);
   assert.match(read(path.join(vault, "Tools", "digital-brain-watch.sh")), /INTERVAL_MINUTES="5"/);
+  assert.equal(readJson(path.join(home, ".digital-brain", "config.json")).defaultVault, vault);
   assert.ok(fs.existsSync(path.join(vault, "AGENTS.md")));
   assert.ok(fs.existsSync(path.join(vault, "CLAUDE.md")));
   assert.ok(fs.existsSync(path.join(vault, "GEMINI.md")));
@@ -56,7 +59,7 @@ test("init writes configured vault files and scripts", () => {
 
 test("init without a vault path creates the default vault in cwd", () => {
   const root = tempDir();
-  run([cli, "init", "--yes", "--connect-ai=false"], {}, { cwd: root });
+  run([cli, "init", "--yes", "--connect-ai=false"], { HOME: testHome(root) }, { cwd: root });
 
   const vault = path.join(root, "Digital Brain Vault");
   const config = readJson(path.join(vault, "digital-brain.config.json"));
@@ -68,7 +71,7 @@ test("init without a vault path creates the default vault in cwd", () => {
 test("full-auto init configures always-on local refresh", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
-  run([cli, "init", vault, "--yes", "--full-auto", "--connect-ai=false"]);
+  run([cli, "init", vault, "--yes", "--full-auto", "--connect-ai=false"], { HOME: testHome(root) });
 
   const config = readJson(path.join(vault, "digital-brain.config.json"));
   assert.equal(config.setupMode, "full-auto");
@@ -81,7 +84,7 @@ test("full-auto init configures always-on local refresh", () => {
 test("init clamps always-on interval to one minute", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
-  run([cli, "init", vault, "--yes", "--refresh-interval-minutes", "0", "--connect-ai=false"]);
+  run([cli, "init", vault, "--yes", "--refresh-interval-minutes", "0", "--connect-ai=false"], { HOME: testHome(root) });
 
   const config = readJson(path.join(vault, "digital-brain.config.json"));
   assert.equal(config.refreshIntervalMinutes, 1);
@@ -137,6 +140,18 @@ test("sample extractor and interpreter produce relationship memory", () => {
   assert.match(interpreted, /## Reply Guidance/);
 });
 
+test("run uses remembered default vault", () => {
+  const root = tempDir();
+  const vault = path.join(root, "sample-vault");
+  const home = testHome(root);
+  fs.cpSync(path.join(repo, "examples", "sample-vault"), vault, { recursive: true });
+  run([cli, "init", vault, "--yes", "--connect-ai=false"], { HOME: home });
+  run([cli, "run", "--skip-sync", "--days", "365", "--min-messages", "1"], { HOME: home });
+
+  const memory = read(path.join(vault, "06 AI Memory", "Interpreted Relationship Memory.md"));
+  assert.match(memory, /Mom/);
+});
+
 function run(args, env = {}, options = {}) {
   const result = spawnSync(process.execPath, args, {
     cwd: options.cwd || repo,
@@ -157,4 +172,10 @@ function readJson(file) {
 
 function tempDir() {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "digital-brain-test-")));
+}
+
+function testHome(root) {
+  const home = path.join(root, "home");
+  fs.mkdirSync(home, { recursive: true });
+  return home;
 }
