@@ -17,21 +17,23 @@ SLANG = {"lol", "lmao", "haha", "hahaha", "bro", "bruh", "wtf", "omg", "ngl", "i
 def main():
     args = parse_args()
     vault = args.vault.resolve()
-    whatsapp = vault / "08 Sources" / "WhatsApp"
-    output_dir = whatsapp / "Analysis"
+    sources = vault / "08 Sources"
+    output_dir = sources / "Analysis"
     output_dir.mkdir(parents=True, exist_ok=True)
-    messages = load_messages(whatsapp / "Raw", args.days)
+    messages = load_messages(sources, args.days)
     profiles = build_profiles(messages, args.min_messages)
     (output_dir / "relationship_profiles.json").write_text(json.dumps(profiles, indent=2, ensure_ascii=False), encoding="utf-8")
     write_markdown(output_dir / "Relationship Map.md", profiles, args.days)
+    write_legacy_whatsapp_outputs(vault, output_dir)
     print(f"Analyzed {len(messages)} messages.")
     print(f"Wrote {len(profiles)} relationship profiles.")
 
 
-def load_messages(raw_dir, days):
+def load_messages(sources_dir, days):
     cutoff = datetime.now(timezone.utc).timestamp() - days * 24 * 60 * 60 if days else None
     messages = []
-    for path in sorted(raw_dir.glob("*.jsonl")):
+    raw_files = sorted(sources_dir.glob("*/Raw/*.jsonl"))
+    for path in raw_files:
         with path.open("r", encoding="utf-8") as f:
             for line in f:
                 if not line.strip():
@@ -48,13 +50,15 @@ def load_messages(raw_dir, days):
 def build_profiles(messages, min_messages):
     by_chat = defaultdict(list)
     for message in messages:
-        by_chat[message.get("chatName") or "Unknown Chat"].append(message)
-    profiles = [profile_chat(name, items) for name, items in by_chat.items() if len(items) >= min_messages]
+        key = f"{message.get('sourceSystem') or source_system(message)}::{message.get('chatName') or 'Unknown Chat'}"
+        by_chat[key].append(message)
+    profiles = [profile_chat(key, items) for key, items in by_chat.items() if len(items) >= min_messages]
     profiles.sort(key=lambda p: (p["messageCount"], p["lastSeen"]), reverse=True)
     return profiles
 
 
-def profile_chat(chat_name, messages):
+def profile_chat(chat_key, messages):
+    source, chat_name = split_chat_key(chat_key)
     count = len(messages)
     outbound = sum(1 for m in messages if m.get("fromMe"))
     inbound = count - outbound
@@ -74,6 +78,8 @@ def profile_chat(chat_name, messages):
     guess = infer_relationship(tags, count, warmth, friction, operational, work, outbound / count)
     return {
         "chatName": chat_name,
+        "sourceSystem": source,
+        "displayName": f"{chat_name} ({source})",
         "messageCount": count,
         "inbound": inbound,
         "outbound": outbound,
@@ -134,8 +140,9 @@ def write_markdown(path, profiles, days):
     lines = ["# Relationship Map", "", f"Window: last {days} days", "", "Generated signals. Treat as editable working notes.", ""]
     for profile in profiles:
         lines.extend([
-            f"## {profile['chatName']}",
+            f"## {profile['displayName']}",
             "",
+            f"- Source: {profile['sourceSystem']}",
             f"- Guess: {profile['relationshipGuess']}",
             f"- Messages: {profile['messageCount']} ({profile['inbound']} inbound, {profile['outbound']} outbound)",
             f"- Dates: {profile['firstSeen']} to {profile['lastSeen']}",
@@ -145,6 +152,34 @@ def write_markdown(path, profiles, days):
             "",
         ])
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_legacy_whatsapp_outputs(vault, output_dir):
+    legacy_dir = vault / "08 Sources" / "WhatsApp" / "Analysis"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("relationship_profiles.json", "Relationship Map.md"):
+        source = output_dir / name
+        target = legacy_dir / name
+        if source.exists():
+            target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+
+def source_system(message):
+    source = message.get("source") or ""
+    if "Slack" in source:
+        return "Slack"
+    if "LinkedIn" in source:
+        return "LinkedIn"
+    if "WhatsApp" in source:
+        return "WhatsApp"
+    return "Unknown"
+
+
+def split_chat_key(key):
+    if "::" not in key:
+        return "Unknown", key
+    source, chat_name = key.split("::", 1)
+    return source, chat_name
 
 
 def score(words, lexicon):

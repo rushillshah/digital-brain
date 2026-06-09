@@ -60,6 +60,8 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - An Obsidian-friendly Markdown vault.
 - AI adapter files for Codex, Claude, and Gemini.
 - WhatsApp Mac import tools.
+- Slack export import tools.
+- LinkedIn data archive import tools.
 - Relationship extraction and interpretation models.
 - Optional WhatsApp Web outbound sender.
 - A refresh script based on your install-time answers.
@@ -68,6 +70,8 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 ## What It Can Do
 
 - Import recent WhatsApp history from the local macOS WhatsApp database.
+- Import Slack workspace exports.
+- Import LinkedIn data archives for connections and messages when available.
 - Build relationship profiles from message patterns.
 - Infer provisional roles like parent, family group, work collaborator, close personal contact, or unlabeled contact.
 - Extract relationship-specific typing style: casing, message length, punctuation, emoji, and slang.
@@ -82,10 +86,14 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 digital-brain init
 digital-brain run
 digital-brain doctor
+digital-brain import-slack --input ./slack-export.zip
+digital-brain import-linkedin --input ./linkedin-archive.zip
 digital-brain send-whatsapp --to "Name" --message "text"
 ```
 
 `init` remembers your vault globally, so `run` works from anywhere. `run` syncs WhatsApp, extracts relationships, and writes interpreted memory in one command.
+
+Slack and LinkedIn are import-based. Digital Brain reads official export archives; it does not scrape LinkedIn or automate private app UIs. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 Use `digital-brain doctor` or `digital-brain tutorial` anytime to see dependency status and next steps.
 
@@ -144,6 +152,8 @@ This uses fake WhatsApp-style messages in `examples/sample-vault`.
 Digital Brain is local-first. It does not upload messages or notes.
 
 WhatsApp support reads the local macOS WhatsApp database when available. This is experimental and unofficial. Outbound messaging uses WhatsApp Web through `whatsapp-web.js`.
+
+Slack support reads Slack workspace export JSON. LinkedIn support reads LinkedIn data archive CSV files when LinkedIn includes the relevant files in your archive.
 
 Relationship labels are working notes, not truth. You can edit them with `relationship_overrides.json`.
 

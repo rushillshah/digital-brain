@@ -44,3 +44,12 @@ Once setup passes, normal use is:
 ```bash
 digital-brain run
 ```
+
+Optional imports:
+
+```bash
+digital-brain import-slack --input ./slack-export.zip
+digital-brain import-linkedin --input ./linkedin-archive.zip
+digital-brain extract
+digital-brain interpret
+```

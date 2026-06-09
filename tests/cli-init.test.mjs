@@ -160,6 +160,39 @@ test("tutorial prints setup guidance", () => {
   assert.match(result.stdout, /digital-brain init/);
 });
 
+test("slack and linkedin imports feed relationship memory", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const slack = path.join(root, "slack-export");
+  const linkedin = path.join(root, "linkedin-archive");
+  fs.mkdirSync(path.join(slack, "general"), { recursive: true });
+  fs.writeFileSync(path.join(slack, "users.json"), JSON.stringify([{ id: "U1", name: "teammate", profile: { real_name: "Team Mate" } }]));
+  fs.writeFileSync(path.join(slack, "channels.json"), JSON.stringify([{ id: "C1", name: "general" }]));
+  fs.writeFileSync(path.join(slack, "general", "2026-01-01.json"), JSON.stringify([
+    { type: "message", user: "U1", text: "Can you send the deck today?", ts: "1767225600.000100" },
+  ]));
+  fs.mkdirSync(linkedin, { recursive: true });
+  fs.writeFileSync(
+    path.join(linkedin, "Connections.csv"),
+    "First Name,Last Name,Company,Position,Connected On\nAda,Lovelace,Analytical Engines,Founder,2026-01-01\n",
+  );
+  fs.writeFileSync(
+    path.join(linkedin, "Messages.csv"),
+    "Date,From,To,Content\n2026-01-01,Ada Lovelace,Me,Great chatting about the launch\n",
+  );
+
+  run([cli, "init", vault, "--yes", "--connect-ai=false"], { HOME: testHome(root) });
+  run([cli, "import-slack", "--vault", vault, "--input", slack, "--days", "3650"]);
+  run([cli, "import-linkedin", "--vault", vault, "--input", linkedin, "--days", "3650"]);
+  run([cli, "extract", "--vault", vault, "--days", "3650", "--min-messages", "1"]);
+  run([cli, "interpret", "--vault", vault, "--days", "3650"]);
+
+  const profiles = readJson(path.join(vault, "08 Sources", "Analysis", "relationship_profiles.json"));
+  assert.ok(profiles.some((profile) => profile.sourceSystem === "Slack"));
+  assert.ok(profiles.some((profile) => profile.sourceSystem === "LinkedIn"));
+  assert.match(read(path.join(vault, "04 People", "LinkedIn Connections.md")), /Ada Lovelace/);
+});
+
 function run(args, env = {}, options = {}) {
   const result = spawnSync(process.execPath, args, {
     cwd: options.cwd || repo,

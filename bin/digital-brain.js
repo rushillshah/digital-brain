@@ -23,6 +23,8 @@ async function main() {
   else if (command === "doctor") doctor();
   else if (command === "tutorial" || command === "setup-check") doctor({ tutorial: true });
   else if (command === "sync-whatsapp") runPython("digital_brain_whatsapp_mac_sync.py", argv);
+  else if (command === "import-slack") runPython("digital_brain_slack_export_import.py", argv);
+  else if (command === "import-linkedin") runPython("digital_brain_linkedin_export_import.py", argv);
   else if (command === "extract") runPython("digital_brain_relationship_extractor.py", argv);
   else if (command === "interpret") runPython("digital_brain_relationship_interpreter.py", argv);
   else if (command === "send-whatsapp") runNode("whatsapp-web/send.mjs", argv);
@@ -464,6 +466,8 @@ Usage:
   digital-brain doctor
   digital-brain tutorial
   digital-brain sync-whatsapp --days 30
+  digital-brain import-slack --input slack-export.zip
+  digital-brain import-linkedin --input linkedin-archive.zip
   digital-brain extract --days 30
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]

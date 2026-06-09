@@ -19,24 +19,33 @@ ROLE_KEYWORDS = [
 def main():
     args = parse_args()
     vault = args.vault.resolve()
-    whatsapp = vault / "08 Sources" / "WhatsApp"
-    profile_path = whatsapp / "Analysis" / "relationship_profiles.json"
+    sources = vault / "08 Sources"
+    whatsapp = sources / "WhatsApp"
+    analysis = sources / "Analysis"
+    profile_path = analysis / "relationship_profiles.json"
+    if not profile_path.exists():
+        profile_path = whatsapp / "Analysis" / "relationship_profiles.json"
     profiles = json.loads(profile_path.read_text(encoding="utf-8"))
-    overrides = load_json(whatsapp / "relationship_overrides.json", {})
-    out_dir = whatsapp / "Analysis" / "Interpreted"
+    overrides = load_overrides(sources)
+    out_dir = analysis / "Interpreted"
+    legacy_out_dir = whatsapp / "Analysis" / "Interpreted"
     people_dir = vault / "04 People" / "Interpreted Relationships"
     out_dir.mkdir(parents=True, exist_ok=True)
+    legacy_out_dir.mkdir(parents=True, exist_ok=True)
     people_dir.mkdir(parents=True, exist_ok=True)
 
     models = []
     for profile in profiles:
-        model = build_model(profile, overrides.get(profile["chatName"], {}))
+        override = overrides.get(profile_key(profile), overrides.get(profile["chatName"], {}))
+        model = build_model(profile, override)
         note = render_note(model)
-        filename = safe_filename(profile["chatName"]) + ".md"
+        filename = safe_filename(profile.get("displayName") or profile["chatName"]) + ".md"
         (out_dir / filename).write_text(note, encoding="utf-8")
+        (legacy_out_dir / filename).write_text(note, encoding="utf-8")
         (people_dir / filename).write_text(note, encoding="utf-8")
         models.append(model)
 
+    (analysis / "interpreted_relationship_models.json").write_text(json.dumps(models, indent=2, ensure_ascii=False), encoding="utf-8")
     (whatsapp / "Analysis" / "interpreted_relationship_models.json").write_text(json.dumps(models, indent=2, ensure_ascii=False), encoding="utf-8")
     write_index(vault / "06 AI Memory" / "Interpreted Relationship Memory.md", models)
     print(f"Wrote interpreted notes: {len(models)}")
@@ -130,9 +139,10 @@ def infer_boundaries(role, difficulty):
 
 
 def render_note(model):
-    return f"""# {model['chatName']}
+    return f"""# {model.get('displayName') or model['chatName']}
 
 Generated: {datetime.now(timezone.utc).isoformat()}
+Source: {model.get('sourceSystem', 'Unknown')}
 Role: {model['role']}
 Role confidence: {model['roleConfidence']}
 Closeness: {model['closeness']}
@@ -173,7 +183,8 @@ def write_index(path, models):
     lines = ["# Interpreted Relationship Memory", "", "Generated working notes. Treat as editable, not truth.", ""]
     for model in models:
         style = model.get("typingStyle", {}).get("signature", "unknown style")
-        lines.append(f"- [[{safe_filename(model['chatName'])}]]: {model['role']} ({model['roleConfidence']}), closeness {model['closeness']}, difficulty {model['conversationDifficulty']}, style {style}")
+        display = model.get("displayName") or model["chatName"]
+        lines.append(f"- [[{safe_filename(display)}]]: {model['role']} ({model['roleConfidence']}), closeness {model['closeness']}, difficulty {model['conversationDifficulty']}, style {style}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -227,6 +238,17 @@ def load_json(path, fallback):
     if not path.exists():
         return fallback
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_overrides(sources):
+    merged = {}
+    for path in sorted(sources.glob("*/relationship_overrides.json")):
+        merged.update(load_json(path, {}))
+    return merged
+
+
+def profile_key(profile):
+    return f"{profile.get('sourceSystem') or 'Unknown'}::{profile.get('chatName') or 'Unknown Chat'}"
 
 
 def parse_args():
