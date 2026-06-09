@@ -1,13 +1,14 @@
-# Project Team
+# Project Team (WhatsApp)
 
-Generated: 2026-06-09T22:26:26.131626+00:00
+Generated: 2026-06-09T23:08:31.243114+00:00
+Source: WhatsApp
 Role: work collaborator
 Role confidence: medium
 Closeness: low/unclear
 Conversation difficulty: practical/low-emotional
 Typing style: short
 
-These are private working notes. Edit them where wrong.
+Generated draft, not truth. These are private working notes. Edit them where wrong.
 
 ## Role / Relationship Label
 - work collaborator (medium confidence).

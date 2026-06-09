@@ -4,3 +4,4 @@ This is a Digital Brain vault. Use it as local personal context when relevant.
 
 Start with `00 Home/Start Here.md`.
 
+Do not read `08 Sources/` raw files unless the user explicitly asks for source-level evidence.

@@ -1,17 +1,18 @@
-# Mom
+# Close Friend (WhatsApp)
 
-Generated: 2026-06-09T22:26:26.131148+00:00
-Role: mother
-Role confidence: high
+Generated: 2026-06-09T23:08:31.243516+00:00
+Source: WhatsApp
+Role: operational contact
+Role confidence: low
 Closeness: medium
 Conversation difficulty: low
-Typing style: very short
+Typing style: short
 
-These are private working notes. Edit them where wrong.
+Generated draft, not truth. These are private working notes. Edit them where wrong.
 
 ## Role / Relationship Label
-- mother (high confidence).
-- Reason: manual override.
+- operational contact (low confidence).
+- Reason: logistics-heavy communication.
 
 ## Closeness And Importance
 - Closeness: medium.
@@ -23,8 +24,8 @@ These are private working notes. Edit them where wrong.
 - Tags: direct-chat, light, warm, logistics-heavy.
 
 ## Typing Style To Match
-- Signature: very short.
-- Average length: 4.0 words / 24.0 chars.
+- Signature: short.
+- Average length: 5.0 words / 30.0 chars.
 - Lowercase share: 0.0.
 - Question share: 0.0.
 - Exclamation share: 0.0.
@@ -32,8 +33,7 @@ These are private working notes. Edit them where wrong.
 - Slang: none detected.
 
 ## How To Continue This Relationship
-- Use warmer language than a work chat.
-- Do not make the interaction purely transactional.
+- Keep tone neutral until the user labels this relationship.
 - Track open loops, plans, dates, and commitments.
 
 ## Reply Guidance

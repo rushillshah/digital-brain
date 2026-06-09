@@ -5,13 +5,13 @@ Outbound sending is disabled unless you explicitly run the sender with `--yes`.
 Draft:
 
 ```bash
-digital-brain send-whatsapp --vault . --to "Name" --message "Text"
+digital-brain send-whatsapp --to "Name" --message "Text"
 ```
 
 Send:
 
 ```bash
-digital-brain send-whatsapp --vault . --to "Name" --message "Text" --yes
+digital-brain send-whatsapp --to "Name" --message "Text" --yes
 ```
 
 Disclosure rule:

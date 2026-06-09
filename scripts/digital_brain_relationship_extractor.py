@@ -3,6 +3,7 @@ import argparse
 import json
 import math
 import re
+import time
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,7 +23,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     messages = load_messages(sources, args.days)
     profiles = build_profiles(messages, args.min_messages)
-    (output_dir / "relationship_profiles.json").write_text(json.dumps(profiles, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_json_atomic(output_dir / "relationship_profiles.json", profiles)
     write_markdown(output_dir / "Relationship Map.md", profiles, args.days)
     write_legacy_whatsapp_outputs(vault, output_dir)
     print(f"Analyzed {len(messages)} messages.")
@@ -38,7 +39,11 @@ def load_messages(sources_dir, days):
             for line in f:
                 if not line.strip():
                     continue
-                record = json.loads(line)
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    print(f"Skipping corrupt JSONL line in {path}")
+                    continue
                 dt = datetime.fromisoformat(record["timestamp"].replace("Z", "+00:00"))
                 if cutoff and dt.timestamp() < cutoff:
                     continue
@@ -151,7 +156,7 @@ def write_markdown(path, profiles, days):
             f"- Typing style: {typing_style_summary(profile['typingStyle'])}",
             "",
         ])
-    path.write_text("\n".join(lines), encoding="utf-8")
+    write_text_atomic(path, "\n".join(lines))
 
 
 def write_legacy_whatsapp_outputs(vault, output_dir):
@@ -161,7 +166,17 @@ def write_legacy_whatsapp_outputs(vault, output_dir):
         source = output_dir / name
         target = legacy_dir / name
         if source.exists():
-            target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+            write_text_atomic(target, source.read_text(encoding="utf-8"))
+
+
+def write_json_atomic(path, data):
+    write_text_atomic(path, json.dumps(data, indent=2, ensure_ascii=False))
+
+
+def write_text_atomic(path, content):
+    temp = path.with_name(f"{path.name}.{time.time_ns()}.tmp")
+    temp.write_text(content, encoding="utf-8")
+    temp.replace(path)
 
 
 def source_system(message):

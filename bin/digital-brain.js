@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { copyDir, ensureDir, packageRoot, resolveVault, writeDefaultVault } from "../lib/fs.js";
 
 const root = packageRoot(import.meta.url);
+const CONFIG_SCHEMA_VERSION = 1;
 
 main().catch((error) => {
   console.error(error.message);
@@ -23,6 +24,7 @@ async function main() {
   else if (command === "doctor") doctor();
   else if (command === "tutorial" || command === "setup-check") doctor({ tutorial: true });
   else if (command === "sync-whatsapp") runPython("digital_brain_whatsapp_mac_sync.py", argv);
+  else if (command === "sync-imessage") runPython("digital_brain_imessage_sync.py", argv);
   else if (command === "import-slack") runPython("digital_brain_slack_export_import.py", argv);
   else if (command === "import-linkedin") runPython("digital_brain_linkedin_export_import.py", argv);
   else if (command === "extract") runPython("digital_brain_relationship_extractor.py", argv);
@@ -46,6 +48,9 @@ async function init(argv, args) {
   let activeWindow = args["active-window"] || "08:00-12:00";
   let timezone = args.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
   let outboundMode = args["outbound-mode"] || "draft";
+  let privacyMode = args["privacy-mode"] || "standard";
+  let sourceMarkdownMode = args["source-markdown-mode"] || "none";
+  let selectedSources = parseList(args.sources || "whatsapp");
   let responsibilityAccepted = fullAuto || schedule === "always-on";
 
   if (!args.yes) {
@@ -83,6 +88,16 @@ async function init(argv, args) {
       });
     }
     activeWindow = await ask(rl, "🪟 Active window for frequent refreshes", activeWindow);
+    selectedSources = await multiSelect(rl, "Sources to set up", [
+      ["whatsapp", "WhatsApp Mac", "Live local sync from WhatsApp for Mac database.", "💚"],
+      ["imessage", "Apple iMessage", "Live local sync from macOS Messages database.", "💬"],
+      ["slack", "Slack export", "Import official Slack workspace export ZIP/folder.", "🧵"],
+      ["linkedin", "LinkedIn archive", "Import official LinkedIn data archive ZIP/folder.", "💼"],
+    ], selectedSources);
+    privacyMode = await select(rl, "Privacy mode", [
+      ["standard", "Standard", "Keep raw JSONL locally for analysis, but do not generate raw chat Markdown.", "🔐"],
+      ["metadata-only", "Metadata only", "Store timestamps and participants, but omit message bodies.", "🧼"],
+    ], privacyMode);
     outboundMode = await select(rl, "WhatsApp outbound mode", [
       ["disabled", "Disabled", "Never prepares WhatsApp sends.", "🔒"],
       ["draft", "Draft only", "Prepares text and requires you to send it.", "✍️"],
@@ -102,6 +117,7 @@ async function init(argv, args) {
   ensureDir(vault);
   copyDir(path.join(root, "templates", "vault"), vault);
   const config = {
+    schemaVersion: CONFIG_SCHEMA_VERSION,
     selfName: selfName || "Me",
     dataWindowDays,
     focus: focus || "relationship-memory",
@@ -110,6 +126,10 @@ async function init(argv, args) {
     activeWindow,
     timezone,
     outboundMode,
+    privacyMode,
+    sourceMarkdownMode,
+    selectedSources,
+    outboundLogMode: args["outbound-log-mode"] || "metadata",
     setupMode,
     responsibilityAccepted,
     defaults: {
@@ -159,17 +179,34 @@ function runRefresh(argv, args) {
   const vault = getVaultFromArgs(argv);
   const config = readVaultConfig(vault);
   const days = String(args.days || args["data-window-days"] || config.dataWindowDays || 30);
-  const syncArgs = ["--vault", vault, "--days", days, "--markdown-mode", args["markdown-mode"] || "month"];
+  const markdownMode = args["markdown-mode"] || config.sourceMarkdownMode || "none";
+  const privacyMode = args["privacy-mode"] || config.privacyMode || "standard";
+  const selectedSources = parseList(args.sources || "").length ? parseList(args.sources) : config.selectedSources || ["whatsapp"];
+  const syncArgs = ["--vault", vault, "--days", days, "--markdown-mode", markdownMode, "--privacy-mode", privacyMode];
   const extractArgs = ["--vault", vault, "--days", days];
   const interpretArgs = ["--vault", vault, "--days", days];
   if (args["min-messages"]) extractArgs.push("--min-messages", String(args["min-messages"]));
   console.log(`Digital Brain refresh: ${vault}`);
-  for (const [label, script, stepArgs] of [
-    ["sync", "digital_brain_whatsapp_mac_sync.py", syncArgs],
-    ["extract", "digital_brain_relationship_extractor.py", extractArgs],
-    ["interpret", "digital_brain_relationship_interpreter.py", interpretArgs],
-  ]) {
-    if (toBoolean(args[`skip-${label}`])) {
+  if (toBoolean(args["dry-run"])) {
+    console.log("Dry run. Planned steps:");
+    if (selectedSources.includes("whatsapp")) console.log(`  sync WhatsApp: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
+    if (selectedSources.includes("imessage")) console.log(`  sync iMessage: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
+    if (selectedSources.includes("slack")) console.log("  Slack: import-only; run digital-brain import-slack --input <export.zip>");
+    if (selectedSources.includes("linkedin")) console.log("  LinkedIn: import-only; run digital-brain import-linkedin --input <archive.zip>");
+    console.log(`  extract relationships: days=${days}`);
+    console.log(`  interpret relationship drafts: days=${days}`);
+    return;
+  }
+  const steps = [];
+  if (selectedSources.includes("whatsapp")) steps.push(["sync WhatsApp", "sync-whatsapp", "digital_brain_whatsapp_mac_sync.py", syncArgs]);
+  if (selectedSources.includes("imessage")) steps.push(["sync iMessage", "sync-imessage", "digital_brain_imessage_sync.py", syncArgs]);
+  steps.push(
+    ["extract", "extract", "digital_brain_relationship_extractor.py", extractArgs],
+    ["interpret", "interpret", "digital_brain_relationship_interpreter.py", interpretArgs],
+  );
+  for (const [label, skipKey, script, stepArgs] of steps) {
+    const skipRequested = toBoolean(args[`skip-${skipKey}`]) || (skipKey.startsWith("sync-") && toBoolean(args["skip-sync"]));
+    if (skipRequested) {
       console.log(`\n→ ${label} skipped`);
       continue;
     }
@@ -210,10 +247,13 @@ function readVaultConfig(vault) {
 }
 
 function printSetupCheck(vault, options = {}) {
+  const config = fs.existsSync(path.join(vault, "digital-brain.config.json")) ? readVaultConfig(vault) : {};
+  const selectedSources = config.selectedSources || ["whatsapp"];
   const pythonVersion = shell("python3", ["--version"], true);
   const pythonSqlite = shell("python3", ["-c", "import sqlite3; print('ok')"], true);
   const ollamaVersion = shell("ollama", ["--version"], true);
   const macDb = path.join(os.homedir(), "Library/Group Containers/group.net.whatsapp.WhatsApp.shared/ChatStorage.sqlite");
+  const messagesDb = path.join(os.homedir(), "Library/Messages/chat.db");
   const checks = [
     {
       label: "Node",
@@ -239,12 +279,6 @@ function printSetupCheck(vault, options = {}) {
       hint: "Use a Python 3 build with sqlite3 support.",
     },
     {
-      label: "WhatsApp Mac database",
-      ok: fs.existsSync(macDb),
-      value: fs.existsSync(macDb) ? "found" : "not found yet",
-      hint: "Open WhatsApp for Mac and log in. If macOS blocks access, grant Terminal Full Disk Access.",
-    },
-    {
       label: "Ollama",
       ok: Boolean(ollamaVersion),
       value: ollamaVersion || "optional",
@@ -252,6 +286,38 @@ function printSetupCheck(vault, options = {}) {
       optional: true,
     },
   ];
+  if (selectedSources.includes("whatsapp")) {
+    checks.push({
+      label: "WhatsApp Mac database",
+      ok: fs.existsSync(macDb),
+      value: fs.existsSync(macDb) ? "found" : "not found yet",
+      hint: "Install/open WhatsApp for Mac, log in, then grant Terminal Full Disk Access if needed: https://faq.whatsapp.com/686469079565350",
+    });
+  }
+  if (selectedSources.includes("imessage")) {
+    checks.push({
+      label: "Apple Messages database",
+      ok: fs.existsSync(messagesDb),
+      value: fs.existsSync(messagesDb) ? "found" : "not found yet",
+      hint: "Open Messages on macOS and grant Terminal Full Disk Access if needed: https://support.apple.com/guide/messages/welcome/mac",
+    });
+  }
+  if (selectedSources.includes("slack")) {
+    checks.push({
+      label: "Slack export",
+      ok: true,
+      value: "import manually",
+      hint: "Export guide: https://slack.com/help/articles/201658943-Export-your-workspace-data",
+    });
+  }
+  if (selectedSources.includes("linkedin")) {
+    checks.push({
+      label: "LinkedIn archive",
+      ok: true,
+      value: "import manually",
+      hint: "Export guide: https://www.linkedin.com/help/linkedin/answer/a566336",
+    });
+  }
 
   console.log("");
   console.log("Setup check");
@@ -270,16 +336,28 @@ function printSetupCheck(vault, options = {}) {
   if (options.tutorial) {
     console.log("");
     console.log("How to use it");
-    console.log("  1. Open WhatsApp for Mac once and keep it logged in.");
-    console.log("  2. Run: digital-brain run");
-    console.log("  3. Ask your AI to use the generated vault notes for personal context.");
+    let step = 1;
+    if (selectedSources.includes("whatsapp")) {
+      console.log(`  ${step++}. Open WhatsApp for Mac once and keep it logged in.`);
+    }
+    if (selectedSources.includes("imessage")) {
+      console.log(`  ${step++}. Open Messages on macOS once and grant Terminal Full Disk Access if needed.`);
+    }
+    if (selectedSources.includes("slack")) {
+      console.log(`  ${step++}. Download a Slack export, then run: digital-brain import-slack --input <export.zip>`);
+    }
+    if (selectedSources.includes("linkedin")) {
+      console.log(`  ${step++}. Download a LinkedIn archive, then run: digital-brain import-linkedin --input <archive.zip>`);
+    }
+    console.log(`  ${step++}. Run: digital-brain run`);
+    console.log(`  ${step}. Ask your AI to use the generated vault notes for personal context.`);
     console.log("");
     console.log("No pip install is needed. npm installs the package dependencies.");
   }
 }
 
 function writeConfig(vault, config) {
-  fs.writeFileSync(path.join(vault, "digital-brain.config.json"), `${JSON.stringify(config, null, 2)}\n`);
+  writeFileAtomic(path.join(vault, "digital-brain.config.json"), `${JSON.stringify(config, null, 2)}\n`);
 }
 
 function writeRefreshScript(vault, config) {
@@ -292,12 +370,12 @@ set -euo pipefail
 VAULT="${vault.replace(/"/g, '\\"')}"
 DAYS="${days}"
 
-digital-brain run --vault "$VAULT" --days "$DAYS" --markdown-mode month
+digital-brain run --vault "$VAULT" --days "$DAYS"
 
 echo "Digital Brain refresh complete for $VAULT"
 `;
   const scriptPath = path.join(toolsDir, "digital-brain-refresh.sh");
-  fs.writeFileSync(scriptPath, content);
+  writeFileAtomic(scriptPath, content);
   fs.chmodSync(scriptPath, 0o755);
 }
 
@@ -320,7 +398,7 @@ while true; do
 done
 `;
   const scriptPath = path.join(toolsDir, "digital-brain-watch.sh");
-  fs.writeFileSync(scriptPath, content);
+  writeFileAtomic(scriptPath, content);
   fs.chmodSync(scriptPath, 0o755);
 }
 
@@ -339,6 +417,12 @@ Use it as local personal context when the user asks about preferences, relations
   const existing = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
   if (!existing.includes(vault)) fs.appendFileSync(file, block);
   console.log(`${label} pointer: ${file}`);
+}
+
+function writeFileAtomic(file, content) {
+  const temp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, content);
+  fs.renameSync(temp, file);
 }
 
 function printSetupHeader(defaultVault) {
@@ -386,6 +470,28 @@ async function select(rl, label, options, fallback) {
   const lower = trimmed.toLowerCase();
   const exact = options.find(([value, title]) => value.toLowerCase() === lower || title.toLowerCase() === lower);
   return exact ? exact[0] : options[defaultIndex][0];
+}
+
+async function multiSelect(rl, label, options, fallbackValues) {
+  const fallback = fallbackValues.length ? fallbackValues : [options[0][0]];
+  console.log("");
+  console.log(`◇ ${label}`);
+  options.forEach(([, title, description, icon = "•"], index) => {
+    const selected = fallback.includes(options[index][0]) ? "  ← default" : "";
+    const letter = letterFor(index);
+    console.log(`  ${letter}) ${icon}  ${title}${selected}`);
+    console.log(`     ${description}`);
+  });
+  const answer = await rl.question(`Choose one or more, comma-separated [${fallback.join(",")}]: `);
+  if (!answer.trim()) return fallback;
+  const values = [];
+  for (const token of answer.split(",").map((value) => value.trim()).filter(Boolean)) {
+    const letterIndex = indexFromLetter(token);
+    const numericIndex = Number(token) - 1;
+    const option = options[letterIndex] || options[numericIndex] || options.find(([value, title]) => value === token || title.toLowerCase() === token.toLowerCase());
+    if (option && !values.includes(option[0])) values.push(option[0]);
+  }
+  return values.length ? values : fallback;
 }
 
 async function confirm(rl, label, fallback) {
@@ -445,6 +551,11 @@ function parseArgs(argv) {
   return out;
 }
 
+function parseList(value) {
+  if (!value) return [];
+  return String(value).split(",").map((item) => item.trim()).filter(Boolean);
+}
+
 function toBoolean(value) {
   if (value === undefined) return false;
   if (value === true) return true;
@@ -466,6 +577,7 @@ Usage:
   digital-brain doctor
   digital-brain tutorial
   digital-brain sync-whatsapp --days 30
+  digital-brain sync-imessage --days 30
   digital-brain import-slack --input slack-export.zip
   digital-brain import-linkedin --input linkedin-archive.zip
   digital-brain extract --days 30

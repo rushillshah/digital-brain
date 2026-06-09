@@ -16,4 +16,5 @@ Rules:
 - Separate facts from interpretation.
 - Treat relationship labels as editable working notes.
 - Do not expose private summaries unless asked.
-
+- Do not read `08 Sources/` raw files unless the user explicitly asks you to inspect source data.
+- Prefer `06 AI Memory/` summaries and `04 People/` human notes for normal context.

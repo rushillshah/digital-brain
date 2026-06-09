@@ -1,13 +1,14 @@
-# Mom
+# Mom (WhatsApp)
 
-Generated: 2026-06-09T22:26:26.131148+00:00
+Generated: 2026-06-09T23:08:31.242409+00:00
+Source: WhatsApp
 Role: mother
 Role confidence: high
 Closeness: medium
 Conversation difficulty: low
 Typing style: very short
 
-These are private working notes. Edit them where wrong.
+Generated draft, not truth. These are private working notes. Edit them where wrong.
 
 ## Role / Relationship Label
 - mother (high confidence).

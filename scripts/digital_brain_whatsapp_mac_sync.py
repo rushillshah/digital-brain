@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 import sqlite3
 import time
@@ -60,7 +61,7 @@ def sync_once(args, seen, raw_dir, chats_dir, whats_app):
 
     added = 0
     for row in rows:
-        record = row_to_record(row, args.self_name)
+        record = row_to_record(row, args.self_name, args.privacy_mode)
         if args.no_groups and record["isGroup"]:
             continue
         if args.chat and args.chat.lower() not in record["chatName"].lower():
@@ -74,13 +75,16 @@ def sync_once(args, seen, raw_dir, chats_dir, whats_app):
     return added
 
 
-def row_to_record(row, self_name):
+def row_to_record(row, self_name, privacy_mode):
     timestamp = datetime.fromtimestamp(float(row["message_date"]) + CORE_DATA_EPOCH_OFFSET, tz=timezone.utc).isoformat()
     chat_name = row["chat_name"] or row["chat_jid"] or "Unknown Chat"
     from_me = bool(row["is_from_me"])
+    body = row["text"] or ""
+    record_id = compound_id(row, timestamp)
     return {
-        "id": str(row["stanza_id"] or f"mac-db-{row['message_pk']}"),
+        "id": record_id,
         "source": "WhatsApp Mac app ChatStorage.sqlite",
+        "sourceSystem": "WhatsApp",
         "timestamp": timestamp,
         "chatPk": row["chat_pk"],
         "chatName": chat_name,
@@ -91,8 +95,21 @@ def row_to_record(row, self_name):
         "fromJid": row["from_jid"],
         "toJid": row["to_jid"],
         "messageType": row["message_type"],
-        "body": row["text"] or "",
+        "body": "" if privacy_mode == "metadata-only" else body,
+        "bodyHash": hashlib.sha256(body.encode("utf-8")).hexdigest() if privacy_mode == "metadata-only" else "",
+        "bodyCharCount": len(body),
     }
+
+
+def compound_id(row, timestamp):
+    parts = [
+        "whatsapp",
+        str(row["chat_pk"] or row["chat_jid"] or "unknown-chat"),
+        str(row["stanza_id"] or "no-stanza"),
+        str(row["message_pk"] or "no-pk"),
+        timestamp,
+    ]
+    return "::".join(parts)
 
 
 def append_jsonl(raw_dir, record):
@@ -110,9 +127,9 @@ def append_markdown(chats_dir, whats_app, record, mode):
     else:
         file_path = chats_dir / f"{safe_filename(record['chatName'])}.md"
     if not file_path.exists():
-        file_path.write_text(f"# {record['chatName']}\n\nSynced from WhatsApp Mac app.\n\n", encoding="utf-8")
-    speaker = record["author"]
-    body = " ".join(record["body"].split())
+        write_text_atomic(file_path, f"# {escape_markdown(record['chatName'])}\n\nSynced from WhatsApp Mac app.\n\n")
+    speaker = escape_markdown(record["author"])
+    body = escape_markdown(" ".join(record["body"].split()))
     with file_path.open("a", encoding="utf-8") as f:
         f.write(f"- {record['timestamp']} | {speaker}: {body}\n")
 
@@ -127,12 +144,23 @@ def load_seen(path):
 
 
 def save_seen(path, seen):
-    path.write_text(json.dumps(sorted(seen), indent=2), encoding="utf-8")
+    write_text_atomic(path, json.dumps(sorted(seen), indent=2))
 
 
 def safe_filename(value):
     cleaned = "".join("-" if char in '/:\\?%*"<>|' else char for char in value)
     return (" ".join(cleaned.split()).strip() or "Unknown Chat")[:120]
+
+
+def escape_markdown(value):
+    text = str(value).replace("\n", " ").replace("\r", " ")
+    return text.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]").replace("|", "\\|")
+
+
+def write_text_atomic(path, content):
+    temp = path.with_name(f"{path.name}.{time.time_ns()}.tmp")
+    temp.write_text(content, encoding="utf-8")
+    temp.replace(path)
 
 
 def parse_args():
@@ -146,6 +174,7 @@ def parse_args():
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--self-name", default="Me")
     parser.add_argument("--markdown-mode", choices=["chat", "month", "none"], default="chat")
+    parser.add_argument("--privacy-mode", choices=["standard", "metadata-only"], default="standard")
     return parser.parse_args()
 
 

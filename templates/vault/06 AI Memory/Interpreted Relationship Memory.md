@@ -1,4 +1,3 @@
 # Interpreted Relationship Memory
 
-Run `digital-brain interpret` to populate this file.
-
+Run `digital-brain run` to populate this file.

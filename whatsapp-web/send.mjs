@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import qrcode from "qrcode-terminal";
 import pkg from "whatsapp-web.js";
@@ -12,6 +13,8 @@ const vault = path.resolve(args.vault);
 const whatsAppDir = path.join(vault, "08 Sources", "WhatsApp");
 const outboundDir = path.join(whatsAppDir, "Outbound");
 const sessionDir = path.join(whatsAppDir, ".session");
+const config = readConfig(vault);
+const outboundLogMode = args["log-mode"] || config.outboundLogMode || "metadata";
 fs.mkdirSync(outboundDir, { recursive: true });
 
 if (!args.yes) {
@@ -36,7 +39,11 @@ client.on("ready", async () => {
   try {
     const chat = await resolveChat(args.to);
     const disclosure = disclosureStatus(chat);
-    if (disclosure.required && !containsDisclosure(args.message) && !args["skip-disclosure-check"]) {
+    const bypassDisclosure = args["skip-disclosure-check"] && process.env.DIGITAL_BRAIN_ALLOW_DISCLOSURE_BYPASS === "1";
+    if (args["skip-disclosure-check"] && !bypassDisclosure) {
+      throw new Error("Disclosure bypass requires DIGITAL_BRAIN_ALLOW_DISCLOSURE_BYPASS=1.");
+    }
+    if (disclosure.required && !containsDisclosure(args.message) && !bypassDisclosure) {
       throw new Error(
         'AI disclosure required before sending. Add a clear disclosure like: "Just flagging this is my AI assistant helping draft/send this."',
       );
@@ -46,13 +53,19 @@ client.on("ready", async () => {
       timestamp: new Date().toISOString(),
       to: args.to,
       resolvedChatName: chatName(chat),
-      message: args.message,
+      message: outboundLogMode === "full" ? args.message : undefined,
+      messageHash: hash(args.message),
+      messageCharCount: args.message.length,
       messageId: sent.id?._serialized || null,
       aiAssisted: !args.human,
       disclosureIncluded: containsDisclosure(args.message),
+      disclosureBypassed: bypassDisclosure,
     };
-    fs.appendFileSync(path.join(outboundDir, "sent.jsonl"), `${JSON.stringify(record)}\n`);
-    fs.appendFileSync(path.join(outboundDir, "Sent.md"), `- ${record.timestamp} | ${record.resolvedChatName}: ${record.message}\n`);
+    if (outboundLogMode !== "off") {
+      fs.appendFileSync(path.join(outboundDir, "sent.jsonl"), `${JSON.stringify(record)}\n`);
+      const visible = outboundLogMode === "full" ? args.message : `[metadata only, ${record.messageCharCount} chars, ${record.messageHash.slice(0, 12)}]`;
+      fs.appendFileSync(path.join(outboundDir, "Sent.md"), `- ${record.timestamp} | ${record.resolvedChatName}: ${visible}\n`);
+    }
     console.log(`Sent to ${record.resolvedChatName}`);
     await client.destroy();
     process.exit(0);
@@ -104,7 +117,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.error('Usage: digital-brain send-whatsapp --vault <path> --to "Name" --message "Text" [--yes]');
+  console.error('Usage: digital-brain send-whatsapp --vault <path> --to "Name" --message "Text" [--yes] [--log-mode metadata|full|off]');
   process.exit(1);
 }
 
@@ -136,4 +149,18 @@ function disclosureStatus(chat) {
 
 function containsDisclosure(message) {
   return /\b(ai|assistant|automated|bot)\b/i.test(message);
+}
+
+function readConfig(vaultPath) {
+  const file = path.join(vaultPath, "digital-brain.config.json");
+  if (!fs.existsSync(file)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function hash(value) {
+  return crypto.createHash("sha256").update(value).digest("hex");
 }

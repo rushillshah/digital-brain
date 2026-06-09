@@ -46,7 +46,7 @@ npx digital-brain init --full-auto
 
 Full-auto means local repeated refreshes. It does not mean blind auto-send. WhatsApp sending still defaults to drafts or explicit confirmation, and the AI-disclosure guard stays enabled.
 
-`init` also runs a setup check. npm installs the package dependencies automatically, and Digital Brain does not require pip packages. If Python, WhatsApp for Mac, or optional Ollama setup is missing, the check prints the exact next step. See [docs/SETUP.md](docs/SETUP.md).
+`init` also runs a setup check. npm installs the package dependencies automatically, and Digital Brain does not require pip packages. If Python or a selected source is missing, the check prints the exact next step and setup link. See [docs/SETUP.md](docs/SETUP.md).
 
 For local development:
 
@@ -60,6 +60,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - An Obsidian-friendly Markdown vault.
 - AI adapter files for Codex, Claude, and Gemini.
 - WhatsApp Mac import tools.
+- Apple iMessage import tools.
 - Slack export import tools.
 - LinkedIn data archive import tools.
 - Relationship extraction and interpretation models.
@@ -70,6 +71,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 ## What It Can Do
 
 - Import recent WhatsApp history from the local macOS WhatsApp database.
+- Import recent iMessage history from the local macOS Messages database.
 - Import Slack workspace exports.
 - Import LinkedIn data archives for connections and messages when available.
 - Build relationship profiles from message patterns.
@@ -86,12 +88,13 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 digital-brain init
 digital-brain run
 digital-brain doctor
+digital-brain sync-imessage --days 30
 digital-brain import-slack --input ./slack-export.zip
 digital-brain import-linkedin --input ./linkedin-archive.zip
 digital-brain send-whatsapp --to "Name" --message "text"
 ```
 
-`init` remembers your vault globally, so `run` works from anywhere. `run` syncs WhatsApp, extracts relationships, and writes interpreted memory in one command.
+`init` remembers your vault globally, so `run` works from anywhere. `run` syncs the live local sources you selected, extracts relationships, and writes interpreted memory in one command.
 
 Slack and LinkedIn are import-based. Digital Brain reads official export archives; it does not scrape LinkedIn or automate private app UIs. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
@@ -101,6 +104,7 @@ The lower-level commands still exist for debugging:
 
 ```bash
 digital-brain sync-whatsapp
+digital-brain sync-imessage
 digital-brain extract
 digital-brain interpret
 ```
@@ -152,6 +156,8 @@ This uses fake WhatsApp-style messages in `examples/sample-vault`.
 Digital Brain is local-first. It does not upload messages or notes.
 
 WhatsApp support reads the local macOS WhatsApp database when available. This is experimental and unofficial. Outbound messaging uses WhatsApp Web through `whatsapp-web.js`.
+
+Apple iMessage support reads the local macOS Messages `chat.db` when available. If the database is missing or inaccessible and iMessage was selected, `digital-brain run` fails with a clear setup error instead of silently skipping it.
 
 Slack support reads Slack workspace export JSON. LinkedIn support reads LinkedIn data archive CSV files when LinkedIn includes the relevant files in your archive.
 

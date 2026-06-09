@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,10 +30,10 @@ def main():
     overrides = load_overrides(sources)
     out_dir = analysis / "Interpreted"
     legacy_out_dir = whatsapp / "Analysis" / "Interpreted"
-    people_dir = vault / "04 People" / "Interpreted Relationships"
+    drafts_dir = vault / "06 AI Memory" / "Generated Relationship Drafts"
     out_dir.mkdir(parents=True, exist_ok=True)
     legacy_out_dir.mkdir(parents=True, exist_ok=True)
-    people_dir.mkdir(parents=True, exist_ok=True)
+    drafts_dir.mkdir(parents=True, exist_ok=True)
 
     models = []
     for profile in profiles:
@@ -40,13 +41,13 @@ def main():
         model = build_model(profile, override)
         note = render_note(model)
         filename = safe_filename(profile.get("displayName") or profile["chatName"]) + ".md"
-        (out_dir / filename).write_text(note, encoding="utf-8")
-        (legacy_out_dir / filename).write_text(note, encoding="utf-8")
-        (people_dir / filename).write_text(note, encoding="utf-8")
+        write_text_atomic(out_dir / filename, note)
+        write_text_atomic(legacy_out_dir / filename, note)
+        write_text_atomic(drafts_dir / filename, note)
         models.append(model)
 
-    (analysis / "interpreted_relationship_models.json").write_text(json.dumps(models, indent=2, ensure_ascii=False), encoding="utf-8")
-    (whatsapp / "Analysis" / "interpreted_relationship_models.json").write_text(json.dumps(models, indent=2, ensure_ascii=False), encoding="utf-8")
+    write_json_atomic(analysis / "interpreted_relationship_models.json", models)
+    write_json_atomic(whatsapp / "Analysis" / "interpreted_relationship_models.json", models)
     write_index(vault / "06 AI Memory" / "Interpreted Relationship Memory.md", models)
     print(f"Wrote interpreted notes: {len(models)}")
 
@@ -149,7 +150,7 @@ Closeness: {model['closeness']}
 Conversation difficulty: {model['conversationDifficulty']}
 Typing style: {model['typingStyle'].get('signature', 'unknown')}
 
-These are private working notes. Edit them where wrong.
+Generated draft, not truth. These are private working notes. Edit them where wrong.
 
 ## Role / Relationship Label
 - {model['role']} ({model['roleConfidence']} confidence).
@@ -185,7 +186,7 @@ def write_index(path, models):
         style = model.get("typingStyle", {}).get("signature", "unknown style")
         display = model.get("displayName") or model["chatName"]
         lines.append(f"- [[{safe_filename(display)}]]: {model['role']} ({model['roleConfidence']}), closeness {model['closeness']}, difficulty {model['conversationDifficulty']}, style {style}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_text_atomic(path, "\n".join(lines) + "\n")
 
 
 def bullets(items):
@@ -238,6 +239,16 @@ def load_json(path, fallback):
     if not path.exists():
         return fallback
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_json_atomic(path, data):
+    write_text_atomic(path, json.dumps(data, indent=2, ensure_ascii=False))
+
+
+def write_text_atomic(path, content):
+    temp = path.with_name(f"{path.name}.{time.time_ns()}.tmp")
+    temp.write_text(content, encoding="utf-8")
+    temp.replace(path)
 
 
 def load_overrides(sources):

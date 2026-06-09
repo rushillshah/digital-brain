@@ -1,13 +1,14 @@
-# Close Friend
+# Close Friend (WhatsApp)
 
-Generated: 2026-06-09T22:26:26.131803+00:00
+Generated: 2026-06-09T23:08:31.243516+00:00
+Source: WhatsApp
 Role: operational contact
 Role confidence: low
 Closeness: medium
 Conversation difficulty: low
 Typing style: short
 
-These are private working notes. Edit them where wrong.
+Generated draft, not truth. These are private working notes. Edit them where wrong.
 
 ## Role / Relationship Label
 - operational contact (low confidence).
