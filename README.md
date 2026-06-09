@@ -24,7 +24,7 @@ Digital Brain gives them a structured, local map of:
 npx digital-brain init
 ```
 
-The installer asks a short setup quiz: history window, primary focus, refresh cadence, active time window, outbound mode, and AI adapter setup.
+The installer asks a short setup quiz: history window, primary focus, refresh cadence, always-on interval, active time window, outbound mode, and AI adapter setup.
 
 For local development:
 
@@ -41,6 +41,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Relationship extraction and interpretation models.
 - Optional WhatsApp Web outbound sender.
 - A refresh script based on your install-time answers.
+- An optional always-on watch script that can pull every N minutes.
 
 ## What It Can Do
 
@@ -74,7 +75,13 @@ Each vault gets:
 Tools/digital-brain-refresh.sh
 ```
 
-Use it with Codex automations, local cron, launchd, or another scheduler. See [docs/AUTOMATIONS.md](docs/AUTOMATIONS.md).
+For 24/7 local polling:
+
+```bash
+Tools/digital-brain-watch.sh
+```
+
+Use these with Codex automations, local cron, launchd, or another scheduler. See [docs/AUTOMATIONS.md](docs/AUTOMATIONS.md).
 
 ## Example
 
