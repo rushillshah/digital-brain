@@ -31,6 +31,7 @@ async function init(argv, args) {
   const positional = argv.filter((arg) => !arg.startsWith("--"));
   const defaultVault = path.resolve(process.cwd(), "Digital Brain Vault");
   const fullAuto = toBoolean(args["full-auto"]);
+  let setupMode = fullAuto ? "full-auto" : "guided";
   let vault = positional[0] ? path.resolve(positional[0]) : args.yes ? defaultVault : "";
   let selfName = args["self-name"] || "";
   let connectAi = toBoolean(args["connect-ai"]);
@@ -49,18 +50,28 @@ async function init(argv, args) {
     vault ||= path.resolve(await ask(rl, "📁 Vault path", defaultVault, "Enter creates this folder if it does not exist."));
     selfName ||= await ask(rl, "👤 Your name", "Me");
     dataWindowDays = await askNumber(rl, "🕰️  History to import", dataWindowDays, { suffix: "days", min: 1 });
+    setupMode = await select(rl, "Setup mode", [
+      ["guided", "Guided", "Pick each setting yourself.", "🧭"],
+      ["full-auto", "Auto mode", "Use recommended always-on local refresh settings.", "⚡"],
+    ], setupMode);
     focus ||= await select(rl, "Primary focus", [
       ["relationship-memory", "Relationship memory", "Map people, tone, and recurring patterns.", "🧠"],
       ["reply-help", "Reply help", "Prioritize drafting guidance and typing-style matching.", "💬"],
       ["work-context", "Work context", "Prioritize collaborators, projects, and operational notes.", "💼"],
     ], "relationship-memory");
-    schedule = await select(rl, "Refresh cadence", [
-      ["manual", "Manual", "Only runs when you run a command.", "🖐️"],
-      ["daily", "Daily", "Good for a low-maintenance personal vault.", "🌅"],
-      ["hourly", "Hourly", "Keeps memory warm without running constantly.", "⏱️"],
-      ["every-30-min", "Every 30 minutes", "Useful for morning or work-window guidance.", "🔁"],
-      ["always-on", "Always-on local loop", "Runs repeatedly while your computer is awake.", "⚡"],
-    ], schedule);
+    if (setupMode === "full-auto") {
+      schedule = "always-on";
+      console.log("");
+      console.log("⚡ Auto mode selected: always-on local refresh, draft-first outbound, AI disclosure guard enabled.");
+    } else {
+      schedule = await select(rl, "Refresh cadence", [
+        ["manual", "Manual", "Only runs when you run a command.", "🖐️"],
+        ["daily", "Daily", "Good for a low-maintenance personal vault.", "🌅"],
+        ["hourly", "Hourly", "Keeps memory warm without running constantly.", "⏱️"],
+        ["every-30-min", "Every 30 minutes", "Useful for morning or work-window guidance.", "🔁"],
+        ["always-on", "Always-on local loop", "Runs repeatedly while your computer is awake.", "⚡"],
+      ], schedule);
+    }
     if (schedule === "always-on") {
       refreshIntervalMinutes = await askNumber(rl, "⏳ Always-on pull interval", refreshIntervalMinutes, {
         suffix: "minutes",
@@ -79,6 +90,7 @@ async function init(argv, args) {
       console.log("Full-auto/outbound confirmation was not accepted. Using manual refresh and draft-only outbound.");
       schedule = "manual";
       outboundMode = "draft";
+      setupMode = "guided";
     }
     rl.close();
   }
@@ -94,7 +106,7 @@ async function init(argv, args) {
     activeWindow,
     timezone,
     outboundMode,
-    setupMode: fullAuto ? "full-auto" : "guided",
+    setupMode,
     responsibilityAccepted,
     defaults: {
       enterUsesDefault: true,

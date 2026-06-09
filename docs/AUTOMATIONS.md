@@ -17,6 +17,7 @@ That script runs sync, extract, and interpret using the install-time config.
 - vault path
 - your name
 - history window in days
+- setup mode: guided or auto mode
 - primary focus: relationship memory, reply help, work context
 - refresh cadence: manual, daily, hourly, every 30 minutes, or always-on
 - refresh interval in minutes for always-on mode, clamped to a minimum of 1
@@ -44,15 +45,15 @@ The answers are saved in:
 digital-brain.config.json
 ```
 
-## Full Auto
+## Auto Mode
 
-Use:
+Choose `Auto mode` during `digital-brain init`, or use:
 
 ```bash
 digital-brain init --full-auto
 ```
 
-Full-auto configures local always-on refreshes with a 5 minute default interval. It still uses the local watch script, so it only runs while the machine and runner are awake.
+Auto mode configures local always-on refreshes with a 5 minute default interval. It still uses the local watch script, so it only runs while the machine and runner are awake.
 
 During the guided quiz, always-on and send-with-confirmation require an explicit responsibility check. Pressing Enter does not approve that check. If it is skipped, Digital Brain falls back to manual refresh and draft-only outbound.
 

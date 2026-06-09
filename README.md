@@ -24,7 +24,7 @@ Digital Brain gives them a structured, local map of:
 npx digital-brain init
 ```
 
-The installer asks a short setup quiz: history window, primary focus, refresh cadence, always-on interval, active time window, outbound mode, and AI adapter setup.
+The installer asks a short setup quiz: setup mode, history window, primary focus, refresh cadence, always-on interval, active time window, outbound mode, and AI adapter setup.
 
 The quiz is mostly multiple choice. Pick with `A/B/C`, `1/2/3`, the exact value, or press Enter to accept the default. If you skip the vault path, Digital Brain creates a new folder in the current directory:
 
@@ -38,7 +38,7 @@ For a non-interactive setup:
 npx digital-brain init --yes
 ```
 
-For local always-on setup:
+Inside the quiz, choose `Auto mode` to use recommended always-on local refresh settings. You can also start there directly:
 
 ```bash
 npx digital-brain init --full-auto
