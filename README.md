@@ -26,7 +26,7 @@ npx digital-brain init
 
 The installer asks a short setup quiz: history window, primary focus, refresh cadence, always-on interval, active time window, outbound mode, and AI adapter setup.
 
-The quiz is mostly multiple choice. Press Enter to accept the default. If you skip the vault path, Digital Brain creates a new folder in the current directory:
+The quiz is mostly multiple choice. Pick with `A/B/C`, `1/2/3`, the exact value, or press Enter to accept the default. If you skip the vault path, Digital Brain creates a new folder in the current directory:
 
 ```text
 ./Digital Brain Vault

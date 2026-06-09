@@ -24,7 +24,7 @@ That script runs sync, extract, and interpret using the install-time config.
 - WhatsApp outbound mode
 - whether to add AI adapter pointers
 
-Most questions are multiple choice. Press Enter to use the displayed default.
+Most questions are multiple choice. Pick with `A/B/C`, `1/2/3`, the exact value, or press Enter to use the displayed default.
 
 Important defaults:
 

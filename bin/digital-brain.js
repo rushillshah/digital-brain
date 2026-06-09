@@ -46,34 +46,34 @@ async function init(argv, args) {
   if (!args.yes) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     printSetupHeader(defaultVault);
-    vault ||= path.resolve(await ask(rl, "Vault path", defaultVault, "Enter creates this folder if it does not exist."));
-    selfName ||= await ask(rl, "Your name", "Me");
-    dataWindowDays = await askNumber(rl, "History to import", dataWindowDays, { suffix: "days", min: 1 });
+    vault ||= path.resolve(await ask(rl, "📁 Vault path", defaultVault, "Enter creates this folder if it does not exist."));
+    selfName ||= await ask(rl, "👤 Your name", "Me");
+    dataWindowDays = await askNumber(rl, "🕰️  History to import", dataWindowDays, { suffix: "days", min: 1 });
     focus ||= await select(rl, "Primary focus", [
-      ["relationship-memory", "Relationship memory", "Map people, tone, and recurring patterns."],
-      ["reply-help", "Reply help", "Prioritize drafting guidance and typing-style matching."],
-      ["work-context", "Work context", "Prioritize collaborators, projects, and operational notes."],
+      ["relationship-memory", "Relationship memory", "Map people, tone, and recurring patterns.", "🧠"],
+      ["reply-help", "Reply help", "Prioritize drafting guidance and typing-style matching.", "💬"],
+      ["work-context", "Work context", "Prioritize collaborators, projects, and operational notes.", "💼"],
     ], "relationship-memory");
     schedule = await select(rl, "Refresh cadence", [
-      ["manual", "Manual", "Only runs when you run a command."],
-      ["daily", "Daily", "Good for a low-maintenance personal vault."],
-      ["hourly", "Hourly", "Keeps memory warm without running constantly."],
-      ["every-30-min", "Every 30 minutes", "Useful for morning or work-window guidance."],
-      ["always-on", "Always-on local loop", "Runs repeatedly while your computer is awake."],
+      ["manual", "Manual", "Only runs when you run a command.", "🖐️"],
+      ["daily", "Daily", "Good for a low-maintenance personal vault.", "🌅"],
+      ["hourly", "Hourly", "Keeps memory warm without running constantly.", "⏱️"],
+      ["every-30-min", "Every 30 minutes", "Useful for morning or work-window guidance.", "🔁"],
+      ["always-on", "Always-on local loop", "Runs repeatedly while your computer is awake.", "⚡"],
     ], schedule);
     if (schedule === "always-on") {
-      refreshIntervalMinutes = await askNumber(rl, "Always-on pull interval", refreshIntervalMinutes, {
+      refreshIntervalMinutes = await askNumber(rl, "⏳ Always-on pull interval", refreshIntervalMinutes, {
         suffix: "minutes",
         min: 1,
       });
     }
-    activeWindow = await ask(rl, "Active window for frequent refreshes", activeWindow);
+    activeWindow = await ask(rl, "🪟 Active window for frequent refreshes", activeWindow);
     outboundMode = await select(rl, "WhatsApp outbound mode", [
-      ["disabled", "Disabled", "Never prepares WhatsApp sends."],
-      ["draft", "Draft only", "Prepares text and requires you to send it."],
-      ["send-with-confirmation", "Send with confirmation", "Can send only after explicit command confirmation."],
+      ["disabled", "Disabled", "Never prepares WhatsApp sends.", "🔒"],
+      ["draft", "Draft only", "Prepares text and requires you to send it.", "✍️"],
+      ["send-with-confirmation", "Send with confirmation", "Can send only after explicit command confirmation.", "✅"],
     ], outboundMode);
-    connectAi = await confirm(rl, "Add global AI pointers for Codex/Claude/Gemini?", true);
+    connectAi = await confirm(rl, "🔗 Add global AI pointers for Codex/Claude/Gemini?", true);
     responsibilityAccepted = await responsibilityGate(rl, { schedule, outboundMode });
     if (!responsibilityAccepted && (schedule === "always-on" || outboundMode === "send-with-confirmation")) {
       console.log("Full-auto/outbound confirmation was not accepted. Using manual refresh and draft-only outbound.");
@@ -226,9 +226,11 @@ Use it as local personal context when the user asks about preferences, relations
 
 function printSetupHeader(defaultVault) {
   console.log("");
-  console.log("Digital Brain setup");
-  console.log("Press Enter to accept the shown default.");
-  console.log(`If you skip the vault path, Digital Brain creates: ${defaultVault}`);
+  console.log("╭────────────────────────────────────────╮");
+  console.log("│ 🧠 Digital Brain setup                 │");
+  console.log("╰────────────────────────────────────────╯");
+  console.log("Pick with A/B/C, 1/2/3, exact value, or press Enter for the default.");
+  console.log(`Skipping the vault path creates: ${defaultVault}`);
   console.log("");
 }
 
@@ -250,18 +252,22 @@ async function askNumber(rl, label, fallback, options = {}) {
 async function select(rl, label, options, fallback) {
   const defaultIndex = Math.max(0, options.findIndex(([value]) => value === fallback));
   console.log("");
-  console.log(`${label}:`);
-  options.forEach(([, title, description], index) => {
-    const marker = index === defaultIndex ? "default" : "";
-    console.log(`  ${index + 1}. ${title}${marker ? ` (${marker})` : ""}`);
+  console.log(`◇ ${label}`);
+  options.forEach(([, title, description, icon = "•"], index) => {
+    const marker = index === defaultIndex ? "  ← default" : "";
+    const letter = letterFor(index);
+    console.log(`  ${letter}) ${icon}  ${title}${marker}`);
     console.log(`     ${description}`);
   });
-  const answer = await rl.question(`Select [${defaultIndex + 1}]: `);
+  const answer = await rl.question(`Choose ${letterFor(defaultIndex)}/${defaultIndex + 1} [${letterFor(defaultIndex)}]: `);
   const trimmed = answer.trim();
   if (!trimmed) return options[defaultIndex][0];
+  const letterIndex = indexFromLetter(trimmed);
+  if (letterIndex >= 0 && letterIndex < options.length) return options[letterIndex][0];
   const selected = Number(trimmed);
   if (Number.isInteger(selected) && selected >= 1 && selected <= options.length) return options[selected - 1][0];
-  const exact = options.find(([value]) => value === trimmed);
+  const lower = trimmed.toLowerCase();
+  const exact = options.find(([value, title]) => value.toLowerCase() === lower || title.toLowerCase() === lower);
   return exact ? exact[0] : options[defaultIndex][0];
 }
 
@@ -276,11 +282,21 @@ async function responsibilityGate(rl, { schedule, outboundMode }) {
   const needsGate = schedule === "always-on" || outboundMode === "send-with-confirmation";
   if (!needsGate) return true;
   console.log("");
-  console.log("Responsibility check:");
+  console.log("⚠️  Responsibility check:");
   console.log("  Digital Brain may use local databases, WhatsApp Web, and black-box third-party app behavior.");
   console.log("  You are responsible for consent, privacy, message content, and any sends triggered from this machine.");
   console.log("  Enter does not approve this mode.");
   return confirm(rl, "I understand and want this mode enabled", false);
+}
+
+function letterFor(index) {
+  return String.fromCharCode(65 + index);
+}
+
+function indexFromLetter(value) {
+  const normalized = value.trim().toUpperCase();
+  if (!/^[A-Z]$/.test(normalized)) return -1;
+  return normalized.charCodeAt(0) - 65;
 }
 
 function shell(command, args, optional = false) {
