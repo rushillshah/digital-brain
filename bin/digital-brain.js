@@ -33,18 +33,44 @@ async function init(argv, args) {
   let vault = positional[0] ? path.resolve(positional[0]) : args.yes ? defaultVault : "";
   let selfName = args["self-name"] || "";
   let connectAi = toBoolean(args["connect-ai"]);
+  let dataWindowDays = Number(args["data-window-days"] || 30);
+  let focus = args.focus || "";
+  let schedule = args.schedule || "manual";
+  let activeWindow = args["active-window"] || "08:00-12:00";
+  let timezone = args.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
+  let outboundMode = args["outbound-mode"] || "draft";
 
   if (!args.yes) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     vault ||= path.resolve(await ask(rl, "Vault path", defaultVault));
     selfName ||= await ask(rl, "Your name", "Me");
+    dataWindowDays = Number(await ask(rl, "How much history should Digital Brain import by default? Days", String(dataWindowDays)));
+    focus ||= await ask(rl, "What should it optimize for? relationship-memory / reply-help / work-context", "relationship-memory");
+    schedule = await ask(rl, "How often should refresh guidance run? manual / hourly / every-30-min / daily", schedule);
+    activeWindow = await ask(rl, "Active window for frequent refreshes", activeWindow);
+    outboundMode = await ask(rl, "WhatsApp outbound mode? disabled / draft / send-with-confirmation", outboundMode);
     connectAi = /^y/i.test(await ask(rl, "Add global AI pointers for Codex/Claude/Gemini?", "y"));
     rl.close();
   }
 
   ensureDir(vault);
   copyDir(path.join(root, "templates", "vault"), vault);
-  writeConfig(vault, { selfName: selfName || "Me" });
+  const config = {
+    selfName: selfName || "Me",
+    dataWindowDays,
+    focus: focus || "relationship-memory",
+    schedule,
+    activeWindow,
+    timezone,
+    outboundMode,
+    disclosureRule: {
+      enabled: true,
+      discloseAfterAiAssistedSends: 2,
+      windowHours: 24,
+    },
+  };
+  writeConfig(vault, config);
+  writeRefreshScript(vault, config);
 
   if (connectAi) {
     addGlobalPointer(path.join(os.homedir(), ".codex", "AGENTS.md"), vault, "Codex");
@@ -53,10 +79,12 @@ async function init(argv, args) {
   }
 
   console.log(`Digital Brain vault created: ${vault}`);
+  console.log(`Config: ${path.join(vault, "digital-brain.config.json")}`);
+  console.log(`Refresh script: ${path.join(vault, "Tools", "digital-brain-refresh.sh")}`);
   console.log("Next:");
-  console.log(`  digital-brain sync-whatsapp --vault "${vault}" --days 30`);
-  console.log(`  digital-brain extract --vault "${vault}" --days 30`);
-  console.log(`  digital-brain interpret --vault "${vault}" --days 30`);
+  console.log(`  digital-brain sync-whatsapp --vault "${vault}" --days ${dataWindowDays}`);
+  console.log(`  digital-brain extract --vault "${vault}" --days ${dataWindowDays}`);
+  console.log(`  digital-brain interpret --vault "${vault}" --days ${dataWindowDays}`);
 }
 
 function doctor() {
@@ -91,6 +119,27 @@ function withVault(argv) {
 
 function writeConfig(vault, config) {
   fs.writeFileSync(path.join(vault, "digital-brain.config.json"), `${JSON.stringify(config, null, 2)}\n`);
+}
+
+function writeRefreshScript(vault, config) {
+  const toolsDir = path.join(vault, "Tools");
+  ensureDir(toolsDir);
+  const days = Number(config.dataWindowDays || 30);
+  const content = `#!/usr/bin/env bash
+set -euo pipefail
+
+VAULT="${vault.replace(/"/g, '\\"')}"
+DAYS="${days}"
+
+digital-brain sync-whatsapp --vault "$VAULT" --days "$DAYS" --markdown-mode month
+digital-brain extract --vault "$VAULT" --days "$DAYS"
+digital-brain interpret --vault "$VAULT" --days "$DAYS"
+
+echo "Digital Brain refresh complete for $VAULT"
+`;
+  const scriptPath = path.join(toolsDir, "digital-brain-refresh.sh");
+  fs.writeFileSync(scriptPath, content);
+  fs.chmodSync(scriptPath, 0o755);
 }
 
 function addGlobalPointer(file, vault, label) {

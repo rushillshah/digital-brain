@@ -24,6 +24,8 @@ Digital Brain gives them a structured, local map of:
 npx digital-brain init
 ```
 
+The installer asks a short setup quiz: history window, primary focus, refresh cadence, active time window, outbound mode, and AI adapter setup.
+
 For local development:
 
 ```bash
@@ -38,6 +40,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - WhatsApp Mac import tools.
 - Relationship extraction and interpretation models.
 - Optional WhatsApp Web outbound sender.
+- A refresh script based on your install-time answers.
 
 ## What It Can Do
 
@@ -62,6 +65,16 @@ digital-brain send-whatsapp --vault ./Digital Brain\ Vault --to "Name" --message
 The sender drafts by default. Add `--yes` to actually send.
 
 If Digital Brain has already sent two AI-assisted messages to the same chat in the last 24 hours, the next send must disclose that AI is helping unless you explicitly bypass the check.
+
+## Automation
+
+Each vault gets:
+
+```bash
+Tools/digital-brain-refresh.sh
+```
+
+Use it with Codex automations, local cron, launchd, or another scheduler. See [docs/AUTOMATIONS.md](docs/AUTOMATIONS.md).
 
 ## Example
 
