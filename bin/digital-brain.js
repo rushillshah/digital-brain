@@ -21,6 +21,7 @@ async function main() {
   if (command === "init") await init(argv, args);
   else if (command === "run" || command === "refresh") runRefresh(argv, args);
   else if (command === "doctor") doctor();
+  else if (command === "tutorial" || command === "setup-check") doctor({ tutorial: true });
   else if (command === "sync-whatsapp") runPython("digital_brain_whatsapp_mac_sync.py", argv);
   else if (command === "extract") runPython("digital_brain_relationship_extractor.py", argv);
   else if (command === "interpret") runPython("digital_brain_relationship_interpreter.py", argv);
@@ -140,20 +141,11 @@ async function init(argv, args) {
   console.log("Next:");
   console.log("  digital-brain run");
   if (schedule === "always-on") console.log(`  "${path.join(vault, "Tools", "digital-brain-watch.sh")}"`);
+  printSetupCheck(vault, { tutorial: true });
 }
 
-function doctor() {
-  const checks = [
-    ["node", process.version],
-    ["python3", shell("python3", ["--version"])],
-    ["sqlite3", shell("sqlite3", ["--version"])],
-    ["ollama", shell("ollama", ["--version"], true)],
-  ];
-  for (const [name, value] of checks) {
-    console.log(`${name}: ${value || "not found"}`);
-  }
-  const macDb = path.join(os.homedir(), "Library/Group Containers/group.net.whatsapp.WhatsApp.shared/ChatStorage.sqlite");
-  console.log(`WhatsApp Mac DB: ${fs.existsSync(macDb) ? macDb : "not found"}`);
+function doctor(options = {}) {
+  printSetupCheck(resolveVault(process.cwd()), options);
 }
 
 function runPython(script, argv) {
@@ -213,6 +205,75 @@ function readVaultConfig(vault) {
     process.exit(1);
   }
   return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+function printSetupCheck(vault, options = {}) {
+  const pythonVersion = shell("python3", ["--version"], true);
+  const pythonSqlite = shell("python3", ["-c", "import sqlite3; print('ok')"], true);
+  const ollamaVersion = shell("ollama", ["--version"], true);
+  const macDb = path.join(os.homedir(), "Library/Group Containers/group.net.whatsapp.WhatsApp.shared/ChatStorage.sqlite");
+  const checks = [
+    {
+      label: "Node",
+      ok: nodeMajor() >= 20,
+      value: process.version,
+      hint: "Install Node 20 or newer from https://nodejs.org.",
+    },
+    {
+      label: "Package dependencies",
+      ok: true,
+      value: "installed by npm",
+    },
+    {
+      label: "Python 3",
+      ok: Boolean(pythonVersion),
+      value: pythonVersion || "not found",
+      hint: "Install with: brew install python",
+    },
+    {
+      label: "Python sqlite3",
+      ok: pythonSqlite === "ok",
+      value: pythonSqlite === "ok" ? "available" : "not found",
+      hint: "Use a Python 3 build with sqlite3 support.",
+    },
+    {
+      label: "WhatsApp Mac database",
+      ok: fs.existsSync(macDb),
+      value: fs.existsSync(macDb) ? "found" : "not found yet",
+      hint: "Open WhatsApp for Mac and log in. If macOS blocks access, grant Terminal Full Disk Access.",
+    },
+    {
+      label: "Ollama",
+      ok: Boolean(ollamaVersion),
+      value: ollamaVersion || "optional",
+      hint: "Optional local LLM: brew install ollama",
+      optional: true,
+    },
+  ];
+
+  console.log("");
+  console.log("Setup check");
+  for (const check of checks) {
+    const icon = check.ok ? "✓" : check.optional ? "○" : "!";
+    console.log(`  ${icon} ${check.label}: ${check.value}`);
+    if (!check.ok && check.hint) console.log(`    ${check.hint}`);
+  }
+  if (fs.existsSync(path.join(vault, "digital-brain.config.json"))) {
+    console.log(`  ✓ Default vault: ${vault}`);
+  } else {
+    console.log("  ! Default vault: not set");
+    console.log("    Run: digital-brain init");
+  }
+
+  if (options.tutorial) {
+    console.log("");
+    console.log("How to use it");
+    console.log("  1. Open WhatsApp for Mac once and keep it logged in.");
+    console.log("  2. Run: digital-brain run");
+    console.log("  3. Ask your AI to use the generated vault notes for personal context.");
+    console.log("");
+    console.log("No pip install is needed. npm installs the package dependencies.");
+  }
 }
 
 function writeConfig(vault, config) {
@@ -360,6 +421,10 @@ function shell(command, args, optional = false) {
   return (result.stdout || result.stderr).trim().split("\n")[0];
 }
 
+function nodeMajor() {
+  return Number(process.version.replace(/^v/, "").split(".")[0]);
+}
+
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i += 1) {
@@ -397,6 +462,7 @@ Usage:
   digital-brain init [vault]
   digital-brain run
   digital-brain doctor
+  digital-brain tutorial
   digital-brain sync-whatsapp --days 30
   digital-brain extract --days 30
   digital-brain interpret --days 30

@@ -46,6 +46,8 @@ npx digital-brain init --full-auto
 
 Full-auto means local repeated refreshes. It does not mean blind auto-send. WhatsApp sending still defaults to drafts or explicit confirmation, and the AI-disclosure guard stays enabled.
 
+`init` also runs a setup check. npm installs the package dependencies automatically, and Digital Brain does not require pip packages. If Python, WhatsApp for Mac, or optional Ollama setup is missing, the check prints the exact next step. See [docs/SETUP.md](docs/SETUP.md).
+
 For local development:
 
 ```bash
@@ -79,10 +81,13 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 ```bash
 digital-brain init
 digital-brain run
+digital-brain doctor
 digital-brain send-whatsapp --to "Name" --message "text"
 ```
 
 `init` remembers your vault globally, so `run` works from anywhere. `run` syncs WhatsApp, extracts relationships, and writes interpreted memory in one command.
+
+Use `digital-brain doctor` or `digital-brain tutorial` anytime to see dependency status and next steps.
 
 The lower-level commands still exist for debugging:
 

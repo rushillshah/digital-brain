@@ -152,6 +152,14 @@ test("run uses remembered default vault", () => {
   assert.match(memory, /Mom/);
 });
 
+test("tutorial prints setup guidance", () => {
+  const root = tempDir();
+  const result = run([cli, "tutorial"], { HOME: testHome(root) }, { cwd: root });
+  assert.match(result.stdout, /Setup check/);
+  assert.match(result.stdout, /No pip install is needed/);
+  assert.match(result.stdout, /digital-brain init/);
+});
+
 function run(args, env = {}, options = {}) {
   const result = spawnSync(process.execPath, args, {
     cwd: options.cwd || repo,
