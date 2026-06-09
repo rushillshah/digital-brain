@@ -1,6 +1,6 @@
 # Working Profile
 
-Fill this in manually or let Selfprint update it over time.
+Fill this in manually or let Digital Brain update it over time.
 
 - Name:
 - Location:

@@ -1,8 +1,8 @@
-# Selfprint
+# Digital Brain
 
 Your private digital imprint for AI.
 
-Selfprint turns your local notes and message history into an editable memory vault that AI assistants can use to understand your people, patterns, tone, and context.
+Digital Brain turns your local notes and message history into an editable memory vault that AI assistants can use to understand your people, patterns, tone, and context.
 
 It is not a chatbot. It is not a cloud memory service. It is the local context layer that makes your existing AI tools feel less generic.
 
@@ -10,7 +10,7 @@ It is not a chatbot. It is not a cloud memory service. It is the local context l
 
 AI tools are powerful, but they usually start every personal question cold.
 
-Selfprint gives them a structured, local map of:
+Digital Brain gives them a structured, local map of:
 
 - who matters in your life
 - how you communicate with different people
@@ -21,14 +21,14 @@ Selfprint gives them a structured, local map of:
 ## Install
 
 ```bash
-npx selfprint init
+npx digital-brain init
 ```
 
 For local development:
 
 ```bash
 npm install
-node ./bin/selfprint.js init ./Selfprint\ Vault
+node ./bin/digital-brain.js init ./Digital Brain\ Vault
 ```
 
 ## What It Creates
@@ -47,28 +47,31 @@ node ./bin/selfprint.js init ./Selfprint\ Vault
 - Generate "how to continue this relationship" notes.
 - Create AI-readable memory files for future prompts.
 - Draft WhatsApp sends by default, and only send with explicit `--yes`.
+- Enforce an AI-disclosure guard after repeated AI-assisted sends.
 
 ## Core Commands
 
 ```bash
-selfprint init ./Selfprint\ Vault
-selfprint sync-whatsapp --vault ./Selfprint\ Vault --days 30
-selfprint extract --vault ./Selfprint\ Vault --days 30
-selfprint interpret --vault ./Selfprint\ Vault --days 30
-selfprint send-whatsapp --vault ./Selfprint\ Vault --to "Name" --message "text"
+digital-brain init ./Digital Brain\ Vault
+digital-brain sync-whatsapp --vault ./Digital Brain\ Vault --days 30
+digital-brain extract --vault ./Digital Brain\ Vault --days 30
+digital-brain interpret --vault ./Digital Brain\ Vault --days 30
+digital-brain send-whatsapp --vault ./Digital Brain\ Vault --to "Name" --message "text"
 ```
 
 The sender drafts by default. Add `--yes` to actually send.
 
+If Digital Brain has already sent two AI-assisted messages to the same chat in the last 24 hours, the next send must disclose that AI is helping unless you explicitly bypass the check.
+
 ## Example
 
-Before Selfprint:
+Before Digital Brain:
 
 > Help me reply to my mom.
 
 Generic AI gives generic advice.
 
-After Selfprint:
+After Digital Brain:
 
 > Help me reply to my mom.
 
@@ -84,7 +87,7 @@ This uses fake WhatsApp-style messages in `examples/sample-vault`.
 
 ## Privacy
 
-Selfprint is local-first. It does not upload messages or notes.
+Digital Brain is local-first. It does not upload messages or notes.
 
 WhatsApp support reads the local macOS WhatsApp database when available. This is experimental and unofficial. Outbound messaging uses WhatsApp Web through `whatsapp-web.js`.
 

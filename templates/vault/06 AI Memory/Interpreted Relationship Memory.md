@@ -1,4 +1,4 @@
 # Interpreted Relationship Memory
 
-Run `selfprint interpret` to populate this file.
+Run `digital-brain interpret` to populate this file.
 

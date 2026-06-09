@@ -1,10 +1,10 @@
 {
-  "name": "selfprint",
+  "name": "digital-brain",
   "version": "0.1.0",
   "description": "Your private digital imprint for AI assistants.",
   "type": "module",
   "bin": {
-    "selfprint": "./bin/selfprint.js"
+    "digital-brain": "./bin/digital-brain.js"
   },
   "files": [
     "bin",
@@ -18,9 +18,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "test:sample": "node ./bin/selfprint.js extract --vault ./examples/sample-vault --days 365 --min-messages 1 && node ./bin/selfprint.js interpret --vault ./examples/sample-vault --days 365",
-    "check": "node --check bin/selfprint.js && node --check lib/*.js && node --check whatsapp-web/*.mjs && python3 -m py_compile scripts/*.py",
-    "start": "node ./bin/selfprint.js"
+    "test:sample": "node ./bin/digital-brain.js extract --vault ./examples/sample-vault --days 365 --min-messages 1 && node ./bin/digital-brain.js interpret --vault ./examples/sample-vault --days 365",
+    "check": "node --check bin/digital-brain.js && node --check lib/*.js && node --check whatsapp-web/*.mjs && python3 -m py_compile scripts/*.py",
+    "start": "node ./bin/digital-brain.js"
   },
   "keywords": [
     "ai",

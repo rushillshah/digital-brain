@@ -20,16 +20,16 @@ async function main() {
 
   if (command === "init") await init(argv, args);
   else if (command === "doctor") doctor();
-  else if (command === "sync-whatsapp") runPython("selfprint_whatsapp_mac_sync.py", argv);
-  else if (command === "extract") runPython("selfprint_relationship_extractor.py", argv);
-  else if (command === "interpret") runPython("selfprint_relationship_interpreter.py", argv);
+  else if (command === "sync-whatsapp") runPython("digital_brain_whatsapp_mac_sync.py", argv);
+  else if (command === "extract") runPython("digital_brain_relationship_extractor.py", argv);
+  else if (command === "interpret") runPython("digital_brain_relationship_interpreter.py", argv);
   else if (command === "send-whatsapp") runNode("whatsapp-web/send.mjs", argv);
   else help();
 }
 
 async function init(argv, args) {
   const positional = argv.filter((arg) => !arg.startsWith("--"));
-  const defaultVault = path.resolve(process.cwd(), "Selfprint Vault");
+  const defaultVault = path.resolve(process.cwd(), "Digital Brain Vault");
   let vault = positional[0] ? path.resolve(positional[0]) : args.yes ? defaultVault : "";
   let selfName = args["self-name"] || "";
   let connectAi = toBoolean(args["connect-ai"]);
@@ -52,11 +52,11 @@ async function init(argv, args) {
     addGlobalPointer(path.join(os.homedir(), ".gemini", "GEMINI.md"), vault, "Gemini");
   }
 
-  console.log(`Selfprint vault created: ${vault}`);
+  console.log(`Digital Brain vault created: ${vault}`);
   console.log("Next:");
-  console.log(`  selfprint sync-whatsapp --vault "${vault}" --days 30`);
-  console.log(`  selfprint extract --vault "${vault}" --days 30`);
-  console.log(`  selfprint interpret --vault "${vault}" --days 30`);
+  console.log(`  digital-brain sync-whatsapp --vault "${vault}" --days 30`);
+  console.log(`  digital-brain extract --vault "${vault}" --days 30`);
+  console.log(`  digital-brain interpret --vault "${vault}" --days 30`);
 }
 
 function doctor() {
@@ -90,16 +90,16 @@ function withVault(argv) {
 }
 
 function writeConfig(vault, config) {
-  fs.writeFileSync(path.join(vault, "selfprint.config.json"), `${JSON.stringify(config, null, 2)}\n`);
+  fs.writeFileSync(path.join(vault, "digital-brain.config.json"), `${JSON.stringify(config, null, 2)}\n`);
 }
 
 function addGlobalPointer(file, vault, label) {
   ensureDir(path.dirname(file));
   const block = `
 
-# Selfprint
+# Digital Brain
 
-Selfprint vault:
+Digital Brain vault:
 
 \`${vault}\`
 
@@ -147,14 +147,14 @@ function toBoolean(value) {
 }
 
 function help() {
-  console.log(`Selfprint
+  console.log(`Digital Brain
 
 Usage:
-  selfprint init [vault]
-  selfprint doctor
-  selfprint sync-whatsapp --vault <path> --days 30
-  selfprint extract --vault <path> --days 30
-  selfprint interpret --vault <path> --days 30
-  selfprint send-whatsapp --vault <path> --to "Name" --message "Text" [--yes]
+  digital-brain init [vault]
+  digital-brain doctor
+  digital-brain sync-whatsapp --vault <path> --days 30
+  digital-brain extract --vault <path> --days 30
+  digital-brain interpret --vault <path> --days 30
+  digital-brain send-whatsapp --vault <path> --to "Name" --message "Text" [--yes]
 `);
 }

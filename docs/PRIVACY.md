@@ -1,6 +1,6 @@
 # Privacy Model
 
-Selfprint is designed for local use.
+Digital Brain is designed for local use.
 
 - Messages are read from local files or local app databases.
 - Relationship models are written as local Markdown and JSON.

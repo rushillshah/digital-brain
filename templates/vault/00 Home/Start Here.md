@@ -1,6 +1,6 @@
 # Start Here
 
-Selfprint is your local context layer for AI assistants.
+Digital Brain is your local context layer for AI assistants.
 
 Core notes:
 

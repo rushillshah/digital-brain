@@ -23,7 +23,7 @@ if (!args.yes) {
 }
 
 const client = new Client({
-  authStrategy: new LocalAuth({ clientId: "selfprint", dataPath: sessionDir }),
+  authStrategy: new LocalAuth({ clientId: "digital-brain", dataPath: sessionDir }),
   puppeteer: { headless: false, args: ["--no-sandbox", "--disable-setuid-sandbox"] },
 });
 
@@ -35,6 +35,12 @@ client.on("qr", (qr) => {
 client.on("ready", async () => {
   try {
     const chat = await resolveChat(args.to);
+    const disclosure = disclosureStatus(chat);
+    if (disclosure.required && !containsDisclosure(args.message) && !args["skip-disclosure-check"]) {
+      throw new Error(
+        'AI disclosure required before sending. Add a clear disclosure like: "Just flagging this is my AI assistant helping draft/send this."',
+      );
+    }
     const sent = await chat.sendMessage(args.message);
     const record = {
       timestamp: new Date().toISOString(),
@@ -42,6 +48,8 @@ client.on("ready", async () => {
       resolvedChatName: chatName(chat),
       message: args.message,
       messageId: sent.id?._serialized || null,
+      aiAssisted: !args.human,
+      disclosureIncluded: containsDisclosure(args.message),
     };
     fs.appendFileSync(path.join(outboundDir, "sent.jsonl"), `${JSON.stringify(record)}\n`);
     fs.appendFileSync(path.join(outboundDir, "Sent.md"), `- ${record.timestamp} | ${record.resolvedChatName}: ${record.message}\n`);
@@ -85,6 +93,8 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--yes") out.yes = true;
+    else if (arg === "--human") out.human = true;
+    else if (arg === "--skip-disclosure-check") out["skip-disclosure-check"] = true;
     else if (arg.startsWith("--")) {
       const key = arg.slice(2);
       out[key] = argv[++i] || "";
@@ -94,6 +104,36 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.error('Usage: selfprint send-whatsapp --vault <path> --to "Name" --message "Text" [--yes]');
+  console.error('Usage: digital-brain send-whatsapp --vault <path> --to "Name" --message "Text" [--yes]');
   process.exit(1);
+}
+
+function disclosureStatus(chat) {
+  const logPath = path.join(outboundDir, "sent.jsonl");
+  if (!fs.existsSync(logPath)) return { required: false, count: 0 };
+
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  const name = chatName(chat);
+  const count = fs
+    .readFileSync(logPath, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        return null;
+      }
+    })
+    .filter((record) => record)
+    .filter((record) => record.resolvedChatName === name)
+    .filter((record) => record.aiAssisted !== false)
+    .filter((record) => new Date(record.timestamp).getTime() >= cutoff)
+    .filter((record) => !record.disclosureIncluded).length;
+
+  return { required: count >= 2, count };
+}
+
+function containsDisclosure(message) {
+  return /\b(ai|assistant|automated|bot)\b/i.test(message);
 }

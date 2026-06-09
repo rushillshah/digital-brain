@@ -1,6 +1,6 @@
-# Selfprint Context
+# Digital Brain Context
 
-This is a Selfprint vault. Use it as local personal context when relevant.
+This is a Digital Brain vault. Use it as local personal context when relevant.
 
 Start with `00 Home/Start Here.md`.
 

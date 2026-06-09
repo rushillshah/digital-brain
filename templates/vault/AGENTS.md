@@ -1,6 +1,6 @@
-# Selfprint Context
+# Digital Brain Context
 
-This is a Selfprint vault.
+This is a Digital Brain vault.
 
 Before answering personal-context questions, read:
 
