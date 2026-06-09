@@ -7,6 +7,7 @@ Generated signals. Treat as editable working notes.
 ## Mom (WhatsApp)
 
 - Source: WhatsApp
+- Canonical person: Mom (person::mom)
 - Guess: warm personal relationship
 - Messages: 2 (1 inbound, 1 outbound)
 - Dates: 2026-01-01 to 2026-01-01
@@ -17,6 +18,7 @@ Generated signals. Treat as editable working notes.
 ## Project Team (WhatsApp)
 
 - Source: WhatsApp
+- Canonical person: Project Team (group::whatsapp::project team)
 - Guess: group, likely social or mixed context
 - Messages: 2 (1 inbound, 1 outbound)
 - Dates: 2026-01-01 to 2026-01-01
@@ -27,6 +29,7 @@ Generated signals. Treat as editable working notes.
 ## Close Friend (WhatsApp)
 
 - Source: WhatsApp
+- Canonical person: Close Friend (person::close friend)
 - Guess: warm personal relationship
 - Messages: 2 (1 inbound, 1 outbound)
 - Dates: 2026-01-01 to 2026-01-01

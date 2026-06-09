@@ -185,10 +185,18 @@ test("slack and linkedin imports feed relationship memory", () => {
   const slack = path.join(root, "slack-export");
   const linkedin = path.join(root, "linkedin-archive");
   fs.mkdirSync(path.join(slack, "general"), { recursive: true });
-  fs.writeFileSync(path.join(slack, "users.json"), JSON.stringify([{ id: "U1", name: "teammate", profile: { real_name: "Team Mate" } }]));
+  fs.mkdirSync(path.join(slack, "D1"), { recursive: true });
+  fs.writeFileSync(path.join(slack, "users.json"), JSON.stringify([
+    { id: "U1", name: "teammate", profile: { real_name: "Team Mate" } },
+    { id: "U2", name: "ada", profile: { real_name: "Ada Lovelace" } },
+  ]));
   fs.writeFileSync(path.join(slack, "channels.json"), JSON.stringify([{ id: "C1", name: "general" }]));
+  fs.writeFileSync(path.join(slack, "dms.json"), JSON.stringify([{ id: "D1" }]));
   fs.writeFileSync(path.join(slack, "general", "2026-01-01.json"), JSON.stringify([
     { type: "message", user: "U1", text: "Can you send the deck today?", ts: "1767225600.000100" },
+  ]));
+  fs.writeFileSync(path.join(slack, "D1", "2026-01-01.json"), JSON.stringify([
+    { type: "message", user: "U2", text: "Can you review the launch note?", ts: "1767225601.000100" },
   ]));
   fs.mkdirSync(linkedin, { recursive: true });
   fs.writeFileSync(
@@ -209,6 +217,14 @@ test("slack and linkedin imports feed relationship memory", () => {
   const profiles = readJson(path.join(vault, "08 Sources", "Analysis", "relationship_profiles.json"));
   assert.ok(profiles.some((profile) => profile.sourceSystem === "Slack"));
   assert.ok(profiles.some((profile) => profile.sourceSystem === "LinkedIn"));
+  const people = readJson(path.join(vault, "08 Sources", "Analysis", "person_identity_map.json"));
+  const ada = people.find((person) => person.displayName === "Ada Lovelace");
+  assert.deepEqual(ada.sources.sort(), ["LinkedIn", "Slack"]);
+  assert.equal(ada.sourceProfiles.length, 2);
+  assert.match(read(path.join(vault, "06 AI Memory", "Person Context Index.md")), /Ada Lovelace/);
+  const replyContext = read(path.join(vault, "06 AI Memory", "Person Reply Context.md"));
+  assert.match(replyContext, /Slack \/ D1/);
+  assert.match(replyContext, /LinkedIn \/ Ada Lovelace/);
   assert.match(read(path.join(vault, "04 People", "LinkedIn Connections.md")), /Ada Lovelace/);
 });
 

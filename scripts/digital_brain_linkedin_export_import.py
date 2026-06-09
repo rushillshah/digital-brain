@@ -81,7 +81,8 @@ def message_record(row, file):
         return None
     sender = first_value(row, ["From", "Sender", "Sender Name", "From Name"]) or "Unknown"
     recipients = first_value(row, ["To", "Recipient", "Recipients", "To Name"]) or "Unknown"
-    conversation = first_value(row, ["Conversation Title", "Subject", "Conversation"]) or recipients or sender
+    explicit_conversation = first_value(row, ["Conversation Title", "Subject", "Conversation"])
+    conversation = explicit_conversation or other_party(sender, recipients)
     return {
         "id": f"linkedin-{file.name}-{timestamp}-{sender}-{hash(body)}",
         "source": "LinkedIn data archive",
@@ -94,6 +95,14 @@ def message_record(row, file):
         "to": recipients,
         "body": body,
     }
+
+
+def other_party(sender, recipients):
+    if sender and sender.lower() not in {"me", "you"}:
+        return sender
+    if recipients and recipients.lower() not in {"me", "you"}:
+        return recipients.split(",")[0].strip()
+    return sender or recipients or "Unknown"
 
 
 def parse_timestamp(value):

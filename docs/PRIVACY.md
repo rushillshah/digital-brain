@@ -8,6 +8,7 @@ Digital Brain is designed for local use.
 - Ollama interpretation is local when enabled.
 - WhatsApp sending uses a local WhatsApp Web session.
 - Raw source data stays under `08 Sources/`; normal AI context should use `06 AI Memory/` and human notes under `04 People/`.
+- Same-person matching across sources is provisional and file-based; keep source evidence visible when using merged person context.
 
 Things to be careful about:
 

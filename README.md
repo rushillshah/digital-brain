@@ -75,9 +75,11 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Import Slack workspace exports.
 - Import LinkedIn data archives for connections and messages when available.
 - Build relationship profiles from message patterns.
+- Merge confirmed-looking same-person profiles across sources into a person context index.
 - Infer provisional roles like parent, family group, work collaborator, close personal contact, or unlabeled contact.
 - Extract relationship-specific typing style: casing, message length, punctuation, emoji, and slang.
 - Generate "how to continue this relationship" notes.
+- Generate reply-ready person context that keeps WhatsApp, iMessage, Slack, and LinkedIn evidence separate under the same person.
 - Create AI-readable memory files for future prompts.
 - Draft WhatsApp sends by default, and only send with explicit `--yes`.
 - Enforce an AI-disclosure guard after repeated AI-assisted sends.

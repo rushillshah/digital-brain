@@ -23,11 +23,15 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     messages = load_messages(sources, args.days)
     profiles = build_profiles(messages, args.min_messages)
+    people = build_people(profiles)
     write_json_atomic(output_dir / "relationship_profiles.json", profiles)
+    write_json_atomic(output_dir / "person_identity_map.json", people)
     write_markdown(output_dir / "Relationship Map.md", profiles, args.days)
+    write_people_memory(vault / "06 AI Memory" / "Person Context Index.md", people, args.days)
     write_legacy_whatsapp_outputs(vault, output_dir)
     print(f"Analyzed {len(messages)} messages.")
     print(f"Wrote {len(profiles)} relationship profiles.")
+    print(f"Wrote {len(people)} canonical person records.")
 
 
 def load_messages(sources_dir, days):
@@ -81,10 +85,15 @@ def profile_chat(chat_key, messages):
     sentiment = normalized_sentiment(positive, negative, count)
     tags = infer_tags(any(m.get("isGroup") for m in messages), count, inbound, outbound, warmth, friction, operational, work, logistics, text.count("?"))
     guess = infer_relationship(tags, count, warmth, friction, operational, work, outbound / count)
+    identity = infer_identity(source, chat_name, messages)
     return {
         "chatName": chat_name,
         "sourceSystem": source,
         "displayName": f"{chat_name} ({source})",
+        "identityName": identity["name"],
+        "canonicalPersonKey": identity["key"],
+        "identityConfidence": identity["confidence"],
+        "identityEvidence": identity["evidence"],
         "messageCount": count,
         "inbound": inbound,
         "outbound": outbound,
@@ -141,6 +150,102 @@ def infer_relationship(tags, count, warmth, friction, operational, work, balance
     return "general relationship, needs human labeling"
 
 
+def infer_identity(source, chat_name, messages):
+    is_group = any(m.get("isGroup") for m in messages)
+    if is_group:
+        return {
+            "name": chat_name,
+            "key": f"group::{source.lower()}::{normalize_identity(chat_name)}",
+            "confidence": "medium",
+            "evidence": "group chat kept source-specific",
+        }
+    candidates = []
+    if source in {"Slack", "LinkedIn"}:
+        candidates.extend((m.get("author") or "").strip() for m in messages if not m.get("fromMe"))
+    if source == "LinkedIn":
+        candidates.extend((m.get("to") or "").split(",")[0].strip() for m in messages if m.get("fromMe"))
+    candidates.append(chat_name)
+    name = best_identity_name(candidates) or chat_name
+    key = f"person::{normalize_identity(name)}"
+    confidence = "medium" if normalize_identity(name) == normalize_identity(chat_name) else "low"
+    if source in {"Slack", "LinkedIn"} and normalize_identity(name) != normalize_identity(chat_name):
+        confidence = "medium"
+    return {
+        "name": name,
+        "key": key,
+        "confidence": confidence,
+        "evidence": f"{source} direct chat identity",
+    }
+
+
+def best_identity_name(candidates):
+    cleaned = [candidate for candidate in candidates if usable_identity_name(candidate)]
+    if not cleaned:
+        return ""
+    counts = Counter(normalize_identity(candidate) for candidate in cleaned)
+    best_key, _ = counts.most_common(1)[0]
+    for candidate in cleaned:
+        if normalize_identity(candidate) == best_key:
+            return candidate
+    return cleaned[0]
+
+
+def usable_identity_name(value):
+    if not value:
+        return False
+    normalized = normalize_identity(value)
+    if not normalized or normalized in {"me", "you", "unknown", "unknown chat", "imessage"}:
+        return False
+    return True
+
+
+def normalize_identity(value):
+    text = str(value or "").lower()
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"[^a-z0-9@+]+", " ", text)
+    return " ".join(text.split())
+
+
+def build_people(profiles):
+    grouped = defaultdict(list)
+    for profile in profiles:
+        key = profile.get("canonicalPersonKey")
+        if key and not key.startswith("group::"):
+            grouped[key].append(profile)
+    people = []
+    for key, items in grouped.items():
+        items.sort(key=lambda item: (item["messageCount"], item["lastSeen"]), reverse=True)
+        sources = sorted({item["sourceSystem"] for item in items})
+        names = [item.get("identityName") or item["chatName"] for item in items]
+        people.append({
+            "canonicalPersonKey": key,
+            "displayName": names[0],
+            "aliases": sorted({name for name in names if name}),
+            "sources": sources,
+            "sourceProfiles": [
+                {
+                    "sourceSystem": item["sourceSystem"],
+                    "chatName": item["chatName"],
+                    "displayName": item["displayName"],
+                    "messageCount": item["messageCount"],
+                    "firstSeen": item["firstSeen"],
+                    "lastSeen": item["lastSeen"],
+                    "relationshipGuess": item["relationshipGuess"],
+                    "typingStyle": item["typingStyle"],
+                    "identityConfidence": item["identityConfidence"],
+                    "identityEvidence": item["identityEvidence"],
+                }
+                for item in items
+            ],
+            "totalMessages": sum(item["messageCount"] for item in items),
+            "firstSeen": min(item["firstSeen"] for item in items),
+            "lastSeen": max(item["lastSeen"] for item in items),
+        })
+    people.sort(key=lambda person: (len(person["sources"]), person["totalMessages"], person["lastSeen"]), reverse=True)
+    return people
+
+
 def write_markdown(path, profiles, days):
     lines = ["# Relationship Map", "", f"Window: last {days} days", "", "Generated signals. Treat as editable working notes.", ""]
     for profile in profiles:
@@ -148,6 +253,7 @@ def write_markdown(path, profiles, days):
             f"## {profile['displayName']}",
             "",
             f"- Source: {profile['sourceSystem']}",
+            f"- Canonical person: {profile['identityName']} ({profile['canonicalPersonKey']})",
             f"- Guess: {profile['relationshipGuess']}",
             f"- Messages: {profile['messageCount']} ({profile['inbound']} inbound, {profile['outbound']} outbound)",
             f"- Dates: {profile['firstSeen']} to {profile['lastSeen']}",
@@ -159,10 +265,31 @@ def write_markdown(path, profiles, days):
     write_text_atomic(path, "\n".join(lines))
 
 
+def write_people_memory(path, people, days):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["# Person Context Index", "", f"Window: last {days} days", "", "Canonical people matched across sources. Treat matches as provisional unless manually confirmed.", ""]
+    for person in people:
+        lines.extend([
+            f"## {person['displayName']}",
+            "",
+            f"- Canonical key: `{person['canonicalPersonKey']}`",
+            f"- Aliases: {', '.join(person['aliases'])}",
+            f"- Sources: {', '.join(person['sources'])}",
+            f"- Messages: {person['totalMessages']}",
+            f"- Dates: {person['firstSeen']} to {person['lastSeen']}",
+            "- Source-specific context:",
+        ])
+        for source in person["sourceProfiles"]:
+            style = typing_style_summary(source.get("typingStyle", {}))
+            lines.append(f"  - {source['sourceSystem']} / {source['chatName']}: {source['relationshipGuess']}; {source['messageCount']} messages; style {style}")
+        lines.append("")
+    write_text_atomic(path, "\n".join(lines) + "\n")
+
+
 def write_legacy_whatsapp_outputs(vault, output_dir):
     legacy_dir = vault / "08 Sources" / "WhatsApp" / "Analysis"
     legacy_dir.mkdir(parents=True, exist_ok=True)
-    for name in ("relationship_profiles.json", "Relationship Map.md"):
+    for name in ("relationship_profiles.json", "person_identity_map.json", "Relationship Map.md"):
         source = output_dir / name
         target = legacy_dir / name
         if source.exists():

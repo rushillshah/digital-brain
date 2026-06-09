@@ -27,6 +27,8 @@ def main():
     if not profile_path.exists():
         profile_path = whatsapp / "Analysis" / "relationship_profiles.json"
     profiles = json.loads(profile_path.read_text(encoding="utf-8"))
+    people_path = analysis / "person_identity_map.json"
+    people = load_json(people_path, [])
     overrides = load_overrides(sources)
     out_dir = analysis / "Interpreted"
     legacy_out_dir = whatsapp / "Analysis" / "Interpreted"
@@ -49,6 +51,7 @@ def main():
     write_json_atomic(analysis / "interpreted_relationship_models.json", models)
     write_json_atomic(whatsapp / "Analysis" / "interpreted_relationship_models.json", models)
     write_index(vault / "06 AI Memory" / "Interpreted Relationship Memory.md", models)
+    write_person_reply_index(vault / "06 AI Memory" / "Person Reply Context.md", people, models)
     print(f"Wrote interpreted notes: {len(models)}")
 
 
@@ -187,6 +190,59 @@ def write_index(path, models):
         display = model.get("displayName") or model["chatName"]
         lines.append(f"- [[{safe_filename(display)}]]: {model['role']} ({model['roleConfidence']}), closeness {model['closeness']}, difficulty {model['conversationDifficulty']}, style {style}")
     write_text_atomic(path, "\n".join(lines) + "\n")
+
+
+def write_person_reply_index(path, people, models):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    models_by_key = {}
+    for model in models:
+        key = model.get("canonicalPersonKey")
+        if key:
+            models_by_key.setdefault(key, []).append(model)
+    if not people:
+        people = synthesize_people(models_by_key)
+    lines = [
+        "# Person Reply Context",
+        "",
+        "Use this first when responding to a specific person. It merges confirmed-looking matches across sources while keeping each source visible.",
+        "",
+    ]
+    for person in people:
+        key = person.get("canonicalPersonKey")
+        linked_models = sorted(models_by_key.get(key, []), key=lambda model: (model["messageCount"], model["lastSeen"]), reverse=True)
+        if not linked_models:
+            continue
+        lines.extend([
+            f"## {person.get('displayName') or linked_models[0].get('identityName') or linked_models[0]['chatName']}",
+            "",
+            f"- Canonical key: `{key}`",
+            f"- Aliases: {', '.join(person.get('aliases') or [])}",
+            f"- Sources: {', '.join(sorted({model['sourceSystem'] for model in linked_models}))}",
+            f"- Total messages: {sum(model['messageCount'] for model in linked_models)}",
+            "- Source-specific guidance:",
+        ])
+        for model in linked_models:
+            lines.extend([
+                f"  - {model['sourceSystem']} / {model['chatName']}: {model['role']} ({model['roleConfidence']}), closeness {model['closeness']}, difficulty {model['conversationDifficulty']}.",
+                f"    Style: {model.get('typingStyle', {}).get('signature', 'unknown')}.",
+                f"    Reply: {' '.join(model.get('replyStyle', [])[:2])}",
+            ])
+        lines.append("")
+    write_text_atomic(path, "\n".join(lines) + "\n")
+
+
+def synthesize_people(models_by_key):
+    people = []
+    for key, models in models_by_key.items():
+        if key.startswith("group::"):
+            continue
+        names = [model.get("identityName") or model["chatName"] for model in models]
+        people.append({
+            "canonicalPersonKey": key,
+            "displayName": names[0],
+            "aliases": sorted(set(names)),
+        })
+    return people
 
 
 def bullets(items):
