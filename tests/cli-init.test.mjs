@@ -98,6 +98,16 @@ test("sample extractor and interpreter produce relationship memory", () => {
   assert.match(memory, /Mom/);
   assert.match(memory, /Project Team/);
   assert.match(memory, /Close Friend/);
+
+  const profiles = readJson(path.join(vault, "08 Sources", "WhatsApp", "Analysis", "relationship_profiles.json"));
+  const mom = profiles.find((profile) => profile.chatName === "Mom");
+  assert.ok(mom.typingStyle);
+  assert.equal(typeof mom.typingStyle.signature, "string");
+  assert.equal(typeof mom.typingStyle.avgWords, "number");
+
+  const interpreted = read(path.join(vault, "04 People", "Interpreted Relationships", "Mom.md"));
+  assert.match(interpreted, /## Typing Style To Match/);
+  assert.match(interpreted, /## Reply Guidance/);
 });
 
 function run(args, env = {}) {

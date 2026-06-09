@@ -48,6 +48,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Import recent WhatsApp history from the local macOS WhatsApp database.
 - Build relationship profiles from message patterns.
 - Infer provisional roles like parent, family group, work collaborator, close personal contact, or unlabeled contact.
+- Extract relationship-specific typing style: casing, message length, punctuation, emoji, and slang.
 - Generate "how to continue this relationship" notes.
 - Create AI-readable memory files for future prompts.
 - Draft WhatsApp sends by default, and only send with explicit `--yes`.

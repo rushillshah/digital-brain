@@ -19,7 +19,19 @@
       "light",
       "warm",
       "logistics-heavy"
-    ]
+    ],
+    "typingStyle": {
+      "sampleSize": 1,
+      "avgChars": 24.0,
+      "avgWords": 4.0,
+      "lowercaseShare": 0.0,
+      "uppercaseShare": 0.0,
+      "questionShare": 0.0,
+      "exclamationShare": 0.0,
+      "emojiShare": 0.0,
+      "slang": [],
+      "signature": "very short"
+    }
   },
   {
     "chatName": "Project Team",
@@ -41,7 +53,19 @@
       "light",
       "logistics-heavy",
       "question-heavy"
-    ]
+    ],
+    "typingStyle": {
+      "sampleSize": 1,
+      "avgChars": 33.0,
+      "avgWords": 6.0,
+      "lowercaseShare": 0.0,
+      "uppercaseShare": 0.0,
+      "questionShare": 0.0,
+      "exclamationShare": 0.0,
+      "emojiShare": 0.0,
+      "slang": [],
+      "signature": "short"
+    }
   },
   {
     "chatName": "Close Friend",
@@ -63,6 +87,18 @@
       "light",
       "warm",
       "logistics-heavy"
-    ]
+    ],
+    "typingStyle": {
+      "sampleSize": 1,
+      "avgChars": 30.0,
+      "avgWords": 5.0,
+      "lowercaseShare": 0.0,
+      "uppercaseShare": 0.0,
+      "questionShare": 0.0,
+      "exclamationShare": 0.0,
+      "emojiShare": 0.0,
+      "slang": [],
+      "signature": "short"
+    }
   }
 ]

@@ -54,6 +54,7 @@ def build_model(profile, override):
         "reciprocity": infer_reciprocity(profile),
         "howToContinue": infer_continuity(profile, role),
         "boundaries": infer_boundaries(role, infer_difficulty(profile)),
+        "replyStyle": infer_reply_style(profile),
     }
 
 
@@ -136,6 +137,7 @@ Role: {model['role']}
 Role confidence: {model['roleConfidence']}
 Closeness: {model['closeness']}
 Conversation difficulty: {model['conversationDifficulty']}
+Typing style: {model['typingStyle'].get('signature', 'unknown')}
 
 These are private working notes. Edit them where wrong.
 
@@ -152,8 +154,14 @@ These are private working notes. Edit them where wrong.
 - Messages: {model['messageCount']} ({model['inbound']} inbound, {model['outbound']} outbound).
 - Tags: {', '.join(model['tags'])}.
 
+## Typing Style To Match
+{render_typing_style(model)}
+
 ## How To Continue This Relationship
 {bullets(model['howToContinue'])}
+
+## Reply Guidance
+{bullets(model['replyStyle'])}
 
 ## What Not To Assume
 {bullets(model['boundaries'])}
@@ -164,12 +172,50 @@ def write_index(path, models):
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["# Interpreted Relationship Memory", "", "Generated working notes. Treat as editable, not truth.", ""]
     for model in models:
-        lines.append(f"- [[{safe_filename(model['chatName'])}]]: {model['role']} ({model['roleConfidence']}), closeness {model['closeness']}, difficulty {model['conversationDifficulty']}")
+        style = model.get("typingStyle", {}).get("signature", "unknown style")
+        lines.append(f"- [[{safe_filename(model['chatName'])}]]: {model['role']} ({model['roleConfidence']}), closeness {model['closeness']}, difficulty {model['conversationDifficulty']}, style {style}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def bullets(items):
     return "\n".join(f"- {item}" for item in items)
+
+
+def render_typing_style(model):
+    style = model.get("typingStyle", {})
+    slang = ", ".join(style.get("slang", [])) or "none detected"
+    lines = [
+        f"- Signature: {style.get('signature', 'unknown')}.",
+        f"- Average length: {style.get('avgWords', 0)} words / {style.get('avgChars', 0)} chars.",
+        f"- Lowercase share: {style.get('lowercaseShare', 0)}.",
+        f"- Question share: {style.get('questionShare', 0)}.",
+        f"- Exclamation share: {style.get('exclamationShare', 0)}.",
+        f"- Emoji share: {style.get('emojiShare', 0)}.",
+        f"- Slang: {slang}.",
+    ]
+    return "\n".join(lines)
+
+
+def infer_reply_style(profile):
+    style = profile.get("typingStyle", {})
+    guidance = []
+    avg_words = style.get("avgWords", 0)
+    if avg_words and avg_words <= 5:
+        guidance.append("Keep replies very short unless context demands detail.")
+    elif avg_words <= 12:
+        guidance.append("Use concise replies with one clear point.")
+    else:
+        guidance.append("Longer replies are acceptable in this relationship.")
+    if style.get("lowercaseShare", 0) > 0.55:
+        guidance.append("Lowercase is acceptable; avoid making it too formal.")
+    if style.get("emojiShare", 0) > 0.2:
+        guidance.append("A light emoji can fit this relationship.")
+    if style.get("questionShare", 0) > 0.25:
+        guidance.append("Asking a direct question fits the existing rhythm.")
+    if style.get("slang"):
+        guidance.append(f"Some familiar slang appears here: {', '.join(style['slang'][:4])}.")
+    guidance.append("Match style without exaggerating or parodying the person.")
+    return guidance
 
 
 def safe_filename(value):

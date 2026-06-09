@@ -11,6 +11,7 @@ POSITIVE = {"love", "thanks", "thank", "amazing", "great", "good", "nice", "perf
 NEGATIVE = {"angry", "annoyed", "upset", "sad", "bad", "hate", "sorry", "fight", "problem", "issue", "wrong", "stress", "fuck", "shit", "worried", "pain", "hurt", "confused"}
 LOGISTICS = {"when", "where", "time", "today", "tomorrow", "meeting", "call", "send", "sent", "come", "coming", "reach", "book", "plan", "schedule"}
 WORK = {"pr", "repo", "client", "customer", "meeting", "deck", "code", "ship", "product", "founder", "startup", "work", "office", "investor", "sales", "demo", "launch"}
+SLANG = {"lol", "lmao", "haha", "hahaha", "bro", "bruh", "wtf", "omg", "ngl", "idk", "rn", "btw", "bc", "pls", "plz", "ya", "yeah", "yep", "nah", "fuck", "shit"}
 
 
 def main():
@@ -59,6 +60,7 @@ def profile_chat(chat_name, messages):
     inbound = count - outbound
     dates = [m["_dt"] for m in messages]
     text = "\n".join(m.get("body") or "" for m in messages)
+    outbound_messages = [m for m in messages if m.get("fromMe") and (m.get("body") or "").strip()]
     words = Counter(re.findall(r"[a-zA-Z']+", text.lower()))
     positive = score(words, POSITIVE)
     negative = score(words, NEGATIVE)
@@ -86,6 +88,7 @@ def profile_chat(chat_name, messages):
         "questionCount": text.count("?"),
         "relationshipGuess": guess,
         "tags": tags,
+        "typingStyle": typing_style(outbound_messages),
     }
 
 
@@ -138,6 +141,7 @@ def write_markdown(path, profiles, days):
             f"- Dates: {profile['firstSeen']} to {profile['lastSeen']}",
             f"- Scores: sentiment {profile['sentimentScore']}, warmth {profile['warmthScore']}, friction {profile['frictionScore']}, operational {profile['operationalScore']}",
             f"- Tags: {', '.join(profile['tags'])}",
+            f"- Typing style: {typing_style_summary(profile['typingStyle'])}",
             "",
         ])
     path.write_text("\n".join(lines), encoding="utf-8")
@@ -145,6 +149,83 @@ def write_markdown(path, profiles, days):
 
 def score(words, lexicon):
     return sum(words[word] for word in lexicon)
+
+
+def typing_style(messages):
+    bodies = [(m.get("body") or "").strip() for m in messages if (m.get("body") or "").strip()]
+    count = len(bodies)
+    if not count:
+        return {
+            "sampleSize": 0,
+            "avgChars": 0,
+            "avgWords": 0,
+            "lowercaseShare": 0,
+            "uppercaseShare": 0,
+            "questionShare": 0,
+            "exclamationShare": 0,
+            "emojiShare": 0,
+            "slang": [],
+            "signature": "no outbound sample",
+        }
+    word_lists = [re.findall(r"[A-Za-z']+", body) for body in bodies]
+    all_words = [word.lower() for words in word_lists for word in words]
+    slang = Counter(word for word in all_words if word in SLANG)
+    avg_chars = sum(len(body) for body in bodies) / count
+    avg_words = sum(len(words) for words in word_lists) / count
+    lowercase = sum(1 for body in bodies if has_letters(body) and body == body.lower()) / count
+    uppercase = sum(1 for body in bodies if has_letters(body) and body == body.upper()) / count
+    questions = sum(1 for body in bodies if "?" in body) / count
+    exclaims = sum(1 for body in bodies if "!" in body) / count
+    emojis = sum(1 for body in bodies if has_emoji(body)) / count
+    return {
+        "sampleSize": count,
+        "avgChars": round(avg_chars, 1),
+        "avgWords": round(avg_words, 1),
+        "lowercaseShare": round(lowercase, 2),
+        "uppercaseShare": round(uppercase, 2),
+        "questionShare": round(questions, 2),
+        "exclamationShare": round(exclaims, 2),
+        "emojiShare": round(emojis, 2),
+        "slang": [word for word, _ in slang.most_common(8)],
+        "signature": infer_typing_signature(avg_words, lowercase, questions, exclaims, emojis, slang),
+    }
+
+
+def typing_style_summary(style):
+    slang = ", ".join(style.get("slang", [])) or "none"
+    return (
+        f"{style.get('signature', 'unknown')}; avg {style.get('avgWords', 0)} words; "
+        f"lowercase {style.get('lowercaseShare', 0)}; emoji {style.get('emojiShare', 0)}; slang {slang}"
+    )
+
+
+def infer_typing_signature(avg_words, lowercase, questions, exclaims, emojis, slang):
+    parts = []
+    if avg_words <= 4:
+        parts.append("very short")
+    elif avg_words <= 10:
+        parts.append("short")
+    else:
+        parts.append("longer-form")
+    if lowercase > 0.55:
+        parts.append("lowercase-heavy")
+    if questions > 0.25:
+        parts.append("question-heavy")
+    if exclaims > 0.2:
+        parts.append("expressive")
+    if emojis > 0.2:
+        parts.append("emoji-friendly")
+    if slang:
+        parts.append("slangy")
+    return ", ".join(parts)
+
+
+def has_letters(text):
+    return any(char.isalpha() for char in text)
+
+
+def has_emoji(text):
+    return any(ord(char) > 10000 for char in text)
 
 
 def normalized_sentiment(positive, negative, count):
