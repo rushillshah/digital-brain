@@ -13,5 +13,7 @@ Things to be careful about:
 - Do not commit a generated vault.
 - Do not paste private message exports into GitHub issues.
 - Do not enable outbound sending without understanding the risk.
+- Treat WhatsApp database access and WhatsApp Web automation as unofficial, changeable integrations.
+- Always-on mode runs on your machine and inherits your local permissions.
+- You are responsible for consent, privacy, message content, and sends made from your machine.
 - Treat relationship labels as editable working notes, not truth.
-

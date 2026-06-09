@@ -30,30 +30,56 @@ async function main() {
 async function init(argv, args) {
   const positional = argv.filter((arg) => !arg.startsWith("--"));
   const defaultVault = path.resolve(process.cwd(), "Digital Brain Vault");
+  const fullAuto = toBoolean(args["full-auto"]);
   let vault = positional[0] ? path.resolve(positional[0]) : args.yes ? defaultVault : "";
   let selfName = args["self-name"] || "";
   let connectAi = toBoolean(args["connect-ai"]);
   let dataWindowDays = Number(args["data-window-days"] || 30);
   let focus = args.focus || "";
-  let schedule = args.schedule || "manual";
+  let schedule = args.schedule || (fullAuto ? "always-on" : "manual");
   let refreshIntervalMinutes = clampInterval(args["refresh-interval-minutes"] || 5);
   let activeWindow = args["active-window"] || "08:00-12:00";
   let timezone = args.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
   let outboundMode = args["outbound-mode"] || "draft";
+  let responsibilityAccepted = fullAuto || schedule === "always-on";
 
   if (!args.yes) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    vault ||= path.resolve(await ask(rl, "Vault path", defaultVault));
+    printSetupHeader(defaultVault);
+    vault ||= path.resolve(await ask(rl, "Vault path", defaultVault, "Enter creates this folder if it does not exist."));
     selfName ||= await ask(rl, "Your name", "Me");
-    dataWindowDays = Number(await ask(rl, "How much history should Digital Brain import by default? Days", String(dataWindowDays)));
-    focus ||= await ask(rl, "What should it optimize for? relationship-memory / reply-help / work-context", "relationship-memory");
-    schedule = await ask(rl, "How should it run? manual / daily / hourly / every-30-min / always-on", schedule);
-    refreshIntervalMinutes = clampInterval(
-      await ask(rl, "If always-on, how often should it pull? Minutes, minimum 1", String(refreshIntervalMinutes)),
-    );
+    dataWindowDays = await askNumber(rl, "History to import", dataWindowDays, { suffix: "days", min: 1 });
+    focus ||= await select(rl, "Primary focus", [
+      ["relationship-memory", "Relationship memory", "Map people, tone, and recurring patterns."],
+      ["reply-help", "Reply help", "Prioritize drafting guidance and typing-style matching."],
+      ["work-context", "Work context", "Prioritize collaborators, projects, and operational notes."],
+    ], "relationship-memory");
+    schedule = await select(rl, "Refresh cadence", [
+      ["manual", "Manual", "Only runs when you run a command."],
+      ["daily", "Daily", "Good for a low-maintenance personal vault."],
+      ["hourly", "Hourly", "Keeps memory warm without running constantly."],
+      ["every-30-min", "Every 30 minutes", "Useful for morning or work-window guidance."],
+      ["always-on", "Always-on local loop", "Runs repeatedly while your computer is awake."],
+    ], schedule);
+    if (schedule === "always-on") {
+      refreshIntervalMinutes = await askNumber(rl, "Always-on pull interval", refreshIntervalMinutes, {
+        suffix: "minutes",
+        min: 1,
+      });
+    }
     activeWindow = await ask(rl, "Active window for frequent refreshes", activeWindow);
-    outboundMode = await ask(rl, "WhatsApp outbound mode? disabled / draft / send-with-confirmation", outboundMode);
-    connectAi = /^y/i.test(await ask(rl, "Add global AI pointers for Codex/Claude/Gemini?", "y"));
+    outboundMode = await select(rl, "WhatsApp outbound mode", [
+      ["disabled", "Disabled", "Never prepares WhatsApp sends."],
+      ["draft", "Draft only", "Prepares text and requires you to send it."],
+      ["send-with-confirmation", "Send with confirmation", "Can send only after explicit command confirmation."],
+    ], outboundMode);
+    connectAi = await confirm(rl, "Add global AI pointers for Codex/Claude/Gemini?", true);
+    responsibilityAccepted = await responsibilityGate(rl, { schedule, outboundMode });
+    if (!responsibilityAccepted && (schedule === "always-on" || outboundMode === "send-with-confirmation")) {
+      console.log("Full-auto/outbound confirmation was not accepted. Using manual refresh and draft-only outbound.");
+      schedule = "manual";
+      outboundMode = "draft";
+    }
     rl.close();
   }
 
@@ -68,6 +94,14 @@ async function init(argv, args) {
     activeWindow,
     timezone,
     outboundMode,
+    setupMode: fullAuto ? "full-auto" : "guided",
+    responsibilityAccepted,
+    defaults: {
+      enterUsesDefault: true,
+      defaultVault,
+      skippedVaultCreates: defaultVault,
+      minimumRefreshIntervalMinutes: 1,
+    },
     disclosureRule: {
       enabled: true,
       discloseAfterAiAssistedSends: 2,
@@ -92,6 +126,7 @@ async function init(argv, args) {
   console.log(`  digital-brain sync-whatsapp --vault "${vault}" --days ${dataWindowDays}`);
   console.log(`  digital-brain extract --vault "${vault}" --days ${dataWindowDays}`);
   console.log(`  digital-brain interpret --vault "${vault}" --days ${dataWindowDays}`);
+  if (schedule === "always-on") console.log(`  "${path.join(vault, "Tools", "digital-brain-watch.sh")}"`);
 }
 
 function doctor() {
@@ -189,9 +224,63 @@ Use it as local personal context when the user asks about preferences, relations
   console.log(`${label} pointer: ${file}`);
 }
 
-async function ask(rl, label, fallback) {
-  const answer = await rl.question(`${label} (${fallback}): `);
+function printSetupHeader(defaultVault) {
+  console.log("");
+  console.log("Digital Brain setup");
+  console.log("Press Enter to accept the shown default.");
+  console.log(`If you skip the vault path, Digital Brain creates: ${defaultVault}`);
+  console.log("");
+}
+
+async function ask(rl, label, fallback, helpText = "") {
+  if (helpText) console.log(`  ${helpText}`);
+  const answer = await rl.question(`${label} [${fallback}]: `);
   return answer.trim() || fallback;
+}
+
+async function askNumber(rl, label, fallback, options = {}) {
+  const suffix = options.suffix ? ` ${options.suffix}` : "";
+  const answer = await ask(rl, `${label}${suffix}`, String(fallback));
+  const parsed = Number(answer);
+  if (!Number.isFinite(parsed)) return Number(fallback);
+  if (Number.isFinite(options.min) && parsed < options.min) return options.min;
+  return Math.floor(parsed);
+}
+
+async function select(rl, label, options, fallback) {
+  const defaultIndex = Math.max(0, options.findIndex(([value]) => value === fallback));
+  console.log("");
+  console.log(`${label}:`);
+  options.forEach(([, title, description], index) => {
+    const marker = index === defaultIndex ? "default" : "";
+    console.log(`  ${index + 1}. ${title}${marker ? ` (${marker})` : ""}`);
+    console.log(`     ${description}`);
+  });
+  const answer = await rl.question(`Select [${defaultIndex + 1}]: `);
+  const trimmed = answer.trim();
+  if (!trimmed) return options[defaultIndex][0];
+  const selected = Number(trimmed);
+  if (Number.isInteger(selected) && selected >= 1 && selected <= options.length) return options[selected - 1][0];
+  const exact = options.find(([value]) => value === trimmed);
+  return exact ? exact[0] : options[defaultIndex][0];
+}
+
+async function confirm(rl, label, fallback) {
+  const hint = fallback ? "Y/n" : "y/N";
+  const answer = (await rl.question(`${label} [${hint}]: `)).trim().toLowerCase();
+  if (!answer) return fallback;
+  return ["y", "yes", "true", "1"].includes(answer);
+}
+
+async function responsibilityGate(rl, { schedule, outboundMode }) {
+  const needsGate = schedule === "always-on" || outboundMode === "send-with-confirmation";
+  if (!needsGate) return true;
+  console.log("");
+  console.log("Responsibility check:");
+  console.log("  Digital Brain may use local databases, WhatsApp Web, and black-box third-party app behavior.");
+  console.log("  You are responsible for consent, privacy, message content, and any sends triggered from this machine.");
+  console.log("  Enter does not approve this mode.");
+  return confirm(rl, "I understand and want this mode enabled", false);
 }
 
 function shell(command, args, optional = false) {

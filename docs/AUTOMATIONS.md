@@ -24,11 +24,37 @@ That script runs sync, extract, and interpret using the install-time config.
 - WhatsApp outbound mode
 - whether to add AI adapter pointers
 
+Most questions are multiple choice. Press Enter to use the displayed default.
+
+Important defaults:
+
+- skipped vault path creates `./Digital Brain Vault` in the current directory
+- skipped name uses `Me`
+- skipped history window uses 30 days
+- skipped focus uses relationship memory
+- skipped schedule uses manual refresh
+- skipped always-on interval uses 5 minutes, with a hard minimum of 1 minute
+- skipped active window uses `08:00-12:00`
+- skipped outbound mode uses draft-only
+- skipped AI pointers are added during the guided quiz
+
 The answers are saved in:
 
 ```bash
 digital-brain.config.json
 ```
+
+## Full Auto
+
+Use:
+
+```bash
+digital-brain init --full-auto
+```
+
+Full-auto configures local always-on refreshes with a 5 minute default interval. It still uses the local watch script, so it only runs while the machine and runner are awake.
+
+During the guided quiz, always-on and send-with-confirmation require an explicit responsibility check. Pressing Enter does not approve that check. If it is skipped, Digital Brain falls back to manual refresh and draft-only outbound.
 
 ## Codex App
 

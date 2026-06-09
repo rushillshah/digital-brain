@@ -26,6 +26,26 @@ npx digital-brain init
 
 The installer asks a short setup quiz: history window, primary focus, refresh cadence, always-on interval, active time window, outbound mode, and AI adapter setup.
 
+The quiz is mostly multiple choice. Press Enter to accept the default. If you skip the vault path, Digital Brain creates a new folder in the current directory:
+
+```text
+./Digital Brain Vault
+```
+
+For a non-interactive setup:
+
+```bash
+npx digital-brain init --yes
+```
+
+For local always-on setup:
+
+```bash
+npx digital-brain init --full-auto
+```
+
+Full-auto means local repeated refreshes. It does not mean blind auto-send. WhatsApp sending still defaults to drafts or explicit confirmation, and the AI-disclosure guard stays enabled.
+
 For local development:
 
 ```bash
@@ -113,6 +133,8 @@ Digital Brain is local-first. It does not upload messages or notes.
 WhatsApp support reads the local macOS WhatsApp database when available. This is experimental and unofficial. Outbound messaging uses WhatsApp Web through `whatsapp-web.js`.
 
 Relationship labels are working notes, not truth. You can edit them with `relationship_overrides.json`.
+
+Always-on and outbound modes depend on local app databases, WhatsApp Web, and third-party behavior that can change. You are responsible for consent, privacy, message content, and anything sent from your machine.
 
 ## Status
 

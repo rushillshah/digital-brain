@@ -42,6 +42,9 @@ test("init writes configured vault files and scripts", () => {
   assert.equal(config.refreshIntervalMinutes, 5);
   assert.equal(config.activeWindow, "08:00-12:00");
   assert.equal(config.outboundMode, "draft");
+  assert.equal(config.setupMode, "guided");
+  assert.equal(config.responsibilityAccepted, true);
+  assert.equal(config.defaults.minimumRefreshIntervalMinutes, 1);
   assert.equal(config.disclosureRule.discloseAfterAiAssistedSends, 2);
 
   assert.match(read(path.join(vault, "Tools", "digital-brain-refresh.sh")), /--days "\$DAYS"/);
@@ -49,6 +52,30 @@ test("init writes configured vault files and scripts", () => {
   assert.ok(fs.existsSync(path.join(vault, "AGENTS.md")));
   assert.ok(fs.existsSync(path.join(vault, "CLAUDE.md")));
   assert.ok(fs.existsSync(path.join(vault, "GEMINI.md")));
+});
+
+test("init without a vault path creates the default vault in cwd", () => {
+  const root = tempDir();
+  run([cli, "init", "--yes", "--connect-ai=false"], {}, { cwd: root });
+
+  const vault = path.join(root, "Digital Brain Vault");
+  const config = readJson(path.join(vault, "digital-brain.config.json"));
+  assert.equal(config.defaults.skippedVaultCreates, vault);
+  assert.equal(config.schedule, "manual");
+  assert.equal(config.outboundMode, "draft");
+});
+
+test("full-auto init configures always-on local refresh", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  run([cli, "init", vault, "--yes", "--full-auto", "--connect-ai=false"]);
+
+  const config = readJson(path.join(vault, "digital-brain.config.json"));
+  assert.equal(config.setupMode, "full-auto");
+  assert.equal(config.schedule, "always-on");
+  assert.equal(config.refreshIntervalMinutes, 5);
+  assert.equal(config.responsibilityAccepted, true);
+  assert.match(read(path.join(vault, "Tools", "digital-brain-watch.sh")), /INTERVAL_MINUTES="5"/);
 });
 
 test("init clamps always-on interval to one minute", () => {
@@ -110,9 +137,9 @@ test("sample extractor and interpreter produce relationship memory", () => {
   assert.match(interpreted, /## Reply Guidance/);
 });
 
-function run(args, env = {}) {
+function run(args, env = {}, options = {}) {
   const result = spawnSync(process.execPath, args, {
-    cwd: repo,
+    cwd: options.cwd || repo,
     env: { ...process.env, ...env },
     encoding: "utf8",
   });
@@ -129,5 +156,5 @@ function readJson(file) {
 }
 
 function tempDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "digital-brain-test-"));
+  return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "digital-brain-test-")));
 }
