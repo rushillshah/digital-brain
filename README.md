@@ -97,6 +97,7 @@ digital-brain import-slack --input ./slack-export.zip
 digital-brain import-linkedin --input ./linkedin-archive.zip
 digital-brain send-whatsapp --to "Name" --message "text"
 digital-brain auto-whatsapp --allow "Name" --model llama3.1
+digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
 ```
 
 `init` remembers your vault globally, so `run` works from anywhere. `run` syncs the live local sources you selected, extracts relationships, and writes interpreted memory in one command.
@@ -122,9 +123,10 @@ The auto-responder is opt-in and runs only while the command is active. On start
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes --no-process-unread
+digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1 --yes
 ```
 
-Even with `--allow-all`, likely business, notification, OTP, delivery, bank, and support chats are skipped by default. Use explicit `--allow "Name"` for trusted personal chats. Pass `--include-businesses` only if you intentionally want those chats included.
+Even with `--allow-all`, likely business, notification, OTP, delivery, bank, and support chats are skipped by default. Use explicit `--allow "Name"` or `--contact "+15551234567"` for trusted personal chats. Pass `--include-businesses` only if you intentionally want those chats included.
 
 If Digital Brain has already sent two AI-assisted messages to the same chat in the last 24 hours, the next send must disclose that AI is helping unless you explicitly bypass the check.
 

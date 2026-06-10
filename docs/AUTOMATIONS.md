@@ -102,12 +102,14 @@ Draft-only:
 
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1
+digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
 ```
 
 Auto-send while the command is running:
 
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
+digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1 --yes
 ```
 
 Broad auto-send for personal chats:
@@ -116,7 +118,7 @@ Broad auto-send for personal chats:
 digital-brain auto-whatsapp --allow-all --model llama3.1 --yes
 ```
 
-`--allow-all` still skips likely business, notification, OTP, bank, delivery, and support chats by default. Use `--include-businesses` only when you intentionally want those chats included. Prefer explicit `--allow "Name"` for friends and family.
+`--allow-all` still skips likely business, notification, OTP, bank, delivery, and support chats by default. Use `--include-businesses` only when you intentionally want those chats included. Prefer explicit `--allow "Name"` or `--contact "+15551234567"` for friends and family.
 
 If you selected `Auto-send while running` during init, `auto-whatsapp` can send without `--yes` while it is running:
 
@@ -128,8 +130,8 @@ Guardrails:
 
 - requires Ollama running locally
 - requires the selected model, for example `ollama pull llama3.1`
-- requires `--allow "Name"` unless `--allow-all` is explicitly passed
-- skips likely business, notification, OTP, and service chats unless `--include-businesses` is passed or the chat is explicitly allowlisted
+- requires `--allow "Name"` or `--contact "+15551234567"` unless `--allow-all` is explicitly passed
+- skips likely business, notification, OTP, and service chats unless `--include-businesses` is passed or the chat is explicitly allowlisted by name or contact number
 - processes unread chats on startup unless `--no-process-unread` is passed
 - skips groups unless `--include-groups` is passed
 - uses a per-chat cooldown, default 20 minutes

@@ -20,6 +20,9 @@ const config = readConfig(vault);
 const model = args.model || config.autoReplyModel || "llama3.1";
 const allow = parseList(args.allow || "");
 const deny = parseList(args.deny || "");
+const contactNumbers = parseList([args.contact, args.phone, args["contact-number"]].filter(Boolean).join(","))
+  .map(normalizePhone)
+  .filter(Boolean);
 const allowAll = Boolean(args["allow-all"]);
 const includeGroups = Boolean(args["include-groups"]);
 const includeBusinesses = Boolean(args["include-businesses"]);
@@ -38,8 +41,8 @@ if (config.outboundMode === "disabled") {
   process.exit(1);
 }
 
-if (!allowAll && allow.length === 0) {
-  console.error('Refusing to auto-reply without an allowlist. Add --allow "Name" or pass --allow-all explicitly.');
+if (!allowAll && allow.length === 0 && contactNumbers.length === 0) {
+  console.error('Refusing to auto-reply without an allowlist. Add --allow "Name", --contact "+15551234567", or pass --allow-all explicitly.');
   process.exit(1);
 }
 
@@ -58,7 +61,7 @@ client.on("qr", (qr) => {
 client.on("ready", async () => {
   console.log(`Digital Brain WhatsApp auto-reply running with Ollama model: ${model}`);
   console.log(sendEnabled ? "Auto-send is enabled." : "Draft mode. Replies will be logged but not sent. Add --yes or set outboundMode=auto-send to send.");
-  console.log(allowAll ? "Allowlist: all chats." : `Allowlist: ${allow.join(", ")}`);
+  console.log(allowAll ? "Allowlist: all chats." : allowlistSummary());
   if (!includeBusinesses) console.log("Likely business, notification, OTP, and service chats are skipped by default.");
   try {
     if (processUnreadOnStart) {
@@ -93,7 +96,7 @@ async function processUnreadChats() {
       console.log(`Skipping unread group chat: ${name}`);
       continue;
     }
-    if (!isAllowed(name) || isDenied(name)) {
+    if (!isAllowed(chat) || isDenied(name)) {
       console.log(`Skipping unread chat outside allowlist: ${name}`);
       continue;
     }
@@ -127,7 +130,7 @@ async function handleMessage(message, knownChat = null) {
     console.log(`Skipping group chat: ${name}`);
     return;
   }
-  if (!isAllowed(name)) {
+  if (!isAllowed(chat)) {
     console.log(`Skipping chat outside allowlist: ${name}`);
     return;
   }
@@ -146,7 +149,7 @@ async function handleMessage(message, knownChat = null) {
 
   console.log(`Fetching context for ${name}...`);
   const recentMessages = await chat.fetchMessages({ limit: 12 });
-  if (shouldSkipNonPersonalChat(name, recentMessages)) {
+  if (shouldSkipNonPersonalChat(chat, recentMessages)) {
     console.log(`Skipping likely business/notification chat: ${name}`);
     markProcessed(message, name, { sent: false });
     return;
@@ -277,12 +280,16 @@ function cleanReply(value) {
     .slice(0, 1200);
 }
 
-function isAllowed(name) {
+function isAllowed(chatOrName) {
   if (allowAll) return true;
+  const name = typeof chatOrName === "string" ? chatOrName : chatName(chatOrName);
+  if (contactNumbers.some((number) => chatMatchesContact(chatOrName, number))) return true;
   return allow.some((item) => name.toLowerCase().includes(item.toLowerCase()));
 }
 
-function isExplicitlyAllowed(name) {
+function isExplicitlyAllowed(chatOrName) {
+  const name = typeof chatOrName === "string" ? chatOrName : chatName(chatOrName);
+  if (contactNumbers.some((number) => chatMatchesContact(chatOrName, number))) return true;
   return allow.some((item) => name.toLowerCase().includes(item.toLowerCase()));
 }
 
@@ -290,8 +297,9 @@ function isDenied(name) {
   return deny.some((item) => name.toLowerCase().includes(item.toLowerCase()));
 }
 
-function shouldSkipNonPersonalChat(name, recentMessages) {
-  if (includeBusinesses || isExplicitlyAllowed(name)) return false;
+function shouldSkipNonPersonalChat(chatOrName, recentMessages) {
+  if (includeBusinesses || isExplicitlyAllowed(chatOrName)) return false;
+  const name = typeof chatOrName === "string" ? chatOrName : chatName(chatOrName);
   return isLikelyBusinessOrAutomation(name, recentMessages);
 }
 
@@ -314,6 +322,41 @@ function isShortCodeOrServiceNumber(text) {
 
 function normalizeBusinessText(value) {
   return String(value || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function chatMatchesContact(chatOrName, normalizedPhone) {
+  if (!normalizedPhone) return false;
+  if (typeof chatOrName === "string") {
+    return phoneCandidateMatches(normalizePhone(chatOrName), normalizedPhone);
+  }
+  const candidates = [
+    chatOrName.id?.user,
+    chatOrName.id?._serialized,
+    chatOrName.name,
+    chatOrName.formattedTitle,
+  ].map(normalizePhone).filter(Boolean);
+  return candidates.some((candidate) => phoneCandidateMatches(candidate, normalizedPhone));
+}
+
+function phoneCandidateMatches(candidate, expected) {
+  if (!candidate || !expected) return false;
+  return candidate.endsWith(expected) || expected.endsWith(candidate);
+}
+
+function normalizePhone(input) {
+  const digits = String(input || "").replace(/[^\d]/g, "");
+  return digits.length >= 8 ? digits : "";
+}
+
+function maskPhone(value) {
+  return value.length <= 4 ? "****" : `****${value.slice(-4)}`;
+}
+
+function allowlistSummary() {
+  const parts = [];
+  if (allow.length) parts.push(`names: ${allow.join(", ")}`);
+  if (contactNumbers.length) parts.push(`contacts: ${contactNumbers.map(maskPhone).join(", ")}`);
+  return `Allowlist: ${parts.join("; ")}`;
 }
 
 function isCoolingDown(name) {
@@ -472,6 +515,6 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.error('Usage: digital-brain auto-whatsapp --allow "Name" --model llama3.1 [--yes] [--allow-all] [--include-groups] [--include-businesses]');
+  console.error('Usage: digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --model llama3.1 [--yes] [--allow-all] [--include-groups] [--include-businesses]');
   process.exit(1);
 }
