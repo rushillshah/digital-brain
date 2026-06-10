@@ -41,11 +41,89 @@ Digital Brain gives them a structured, local map of:
 - what tone to use when drafting replies
 - what not to assume
 
-## Install
+## Quick Start
+
+Install and create a vault:
 
 ```bash
 npx digital-brain init
 ```
+
+Then pick the source path that matches your machine.
+
+### Windows Or Cross-Platform
+
+Use WhatsApp Web/Desktop linked-device sync. This is the recommended WhatsApp path for Windows.
+
+```bash
+digital-brain sync-whatsapp-web --days 30
+digital-brain extract --days 30
+digital-brain interpret --days 30
+```
+
+On first run, scan the QR from WhatsApp > Linked devices.
+
+### Mac
+
+Mac can use the same cross-platform WhatsApp Web sync, plus macOS-only local sources:
+
+```bash
+digital-brain sync-whatsapp-web --days 30
+digital-brain sync-whatsapp --days 30
+digital-brain sync-imessage --days 30
+digital-brain extract --days 30
+digital-brain interpret --days 30
+```
+
+`sync-whatsapp` and `sync-imessage` need local app database access and may require Full Disk Access.
+
+### Work Sources
+
+Official exports and API-backed sends work on Windows, Mac, and Linux:
+
+```bash
+digital-brain import-slack --input ./slack-export.zip
+digital-brain import-teams --input ./teams-export.zip
+digital-brain import-linkedin --input ./linkedin-archive.zip
+digital-brain import-gmail --input ./takeout.mbox --self-email you@example.com
+digital-brain import-calendar --input ./calendar.ics
+digital-brain extract --days 365
+digital-brain interpret --days 365
+```
+
+### Best With An LLM
+
+Digital Brain creates the local memory. An LLM makes it useful for querying, summarizing, and reply drafting.
+
+Choose one:
+
+```bash
+# Local and free after install
+ollama pull llama3.1
+digital-brain auto-whatsapp --allow "Name" --provider ollama --model llama3.1
+
+# Hosted APIs
+OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow "Name" --provider openai --model gpt-4.1-mini --yes
+ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow "Name" --provider anthropic --yes
+XAI_API_KEY="xai-..." digital-brain auto-whatsapp --allow "Name" --provider xai --yes
+```
+
+For general questions, point your AI assistant at the vault files under `06 AI Memory/` and `08 Sources/Analysis/`.
+
+### Ask An AI For Help
+
+Most AI assistants will not automatically know the newest npm package behavior unless they can browse the web or read your local files. Give them this:
+
+```text
+I installed the npm package digital-brain. Use the current package docs from https://www.npmjs.com/package/digital-brain or this local repo/vault if available.
+
+My OS is: <Windows/Mac/Linux>
+My vault path is: <paste path>
+I want to ingest: <WhatsApp Web, Slack, Teams, LinkedIn, Gmail, Calendar, repos>
+Tell me the exact digital-brain commands to run, using WhatsApp Web sync on Windows and macOS local database sync only on Mac.
+```
+
+## Install Details
 
 Desktop preview from a cloned repo:
 

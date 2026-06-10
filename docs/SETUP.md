@@ -22,7 +22,10 @@ After the quiz, `init` runs a setup check for:
   - Apple Messages local database access
 - selected import source instructions:
   - Slack export link
+  - Microsoft Teams export instructions
   - LinkedIn archive link
+  - Gmail Takeout instructions
+  - Google Calendar export instructions
 - optional Ollama
 
 Run the check again anytime:
@@ -80,4 +83,50 @@ Useful direct sync commands:
 digital-brain sync-whatsapp --days 30
 digital-brain sync-whatsapp-web --days 30
 digital-brain sync-imessage --days 30
+```
+
+## Which Commands Should I Run?
+
+Windows or cross-platform WhatsApp:
+
+```bash
+digital-brain sync-whatsapp-web --days 30
+digital-brain extract --days 30
+digital-brain interpret --days 30
+```
+
+Mac local app sources:
+
+```bash
+digital-brain sync-whatsapp --days 30
+digital-brain sync-imessage --days 30
+digital-brain extract --days 30
+digital-brain interpret --days 30
+```
+
+Work exports:
+
+```bash
+digital-brain import-slack --input ./slack-export.zip
+digital-brain import-teams --input ./teams-export.zip
+digital-brain import-linkedin --input ./linkedin-archive.zip
+digital-brain import-gmail --input ./takeout.mbox --self-email you@example.com
+digital-brain import-calendar --input ./calendar.ics
+digital-brain extract --days 365
+digital-brain interpret --days 365
+```
+
+Best with a local LLM:
+
+```bash
+ollama pull llama3.1
+digital-brain auto-whatsapp --allow "Name" --provider ollama --model llama3.1
+```
+
+Hosted providers work too:
+
+```bash
+OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow "Name" --provider openai --model gpt-4.1-mini --yes
+ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow "Name" --provider anthropic --yes
+XAI_API_KEY="xai-..." digital-brain auto-whatsapp --allow "Name" --provider xai --yes
 ```

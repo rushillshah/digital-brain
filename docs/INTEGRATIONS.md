@@ -20,6 +20,8 @@ Dependency selected in setup:
 - If WhatsApp is selected and the database is missing, `digital-brain run` exits with an error.
 - For WhatsApp Desktop/Web, run `digital-brain sync-whatsapp-web --days 30` and scan the QR from WhatsApp > Linked devices on first use.
 
+Windows users should use `sync-whatsapp-web`. The native local WhatsApp database path is Mac-only today.
+
 ## Apple iMessage
 
 ```bash
