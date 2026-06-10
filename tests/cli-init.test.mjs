@@ -331,6 +331,16 @@ test("auto-whatsapp requires an explicit allowlist", () => {
   assert.match(`${result.stdout}\n${result.stderr}`, /Refusing to auto-reply without an allowlist/);
 });
 
+test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", () => {
+  const source = read(path.join(repo, "whatsapp-web", "auto-reply.mjs"));
+  assert.match(source, /Default to 1-12 words for casual chats/);
+  assert.match(source, /Do not repeat facts, plans, suggestions, or context/);
+  assert.match(source, /Avoid assistant-like niceness and filler/);
+  assert.match(source, /btw ai is helping me reply rn/);
+  assert.match(source, /max_output_tokens: 80/);
+  assert.match(source, /temperature: 0.25/);
+});
+
 test("slack and linkedin imports feed relationship memory", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");

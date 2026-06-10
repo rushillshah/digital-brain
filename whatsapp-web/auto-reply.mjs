@@ -274,7 +274,7 @@ async function handleMessage(message, knownChat = null) {
   const reply = await generateReply(prompt);
   console.log(`Generated reply for ${name} in ${Date.now() - startedAt}ms: ${summarize(reply || "[empty reply]")}`);
   const finalReply = disclosure.required && !containsDisclosure(reply)
-    ? `Just flagging this is my AI assistant helping draft/send this. ${reply}`
+    ? `btw ai is helping me reply rn. ${reply}`
     : reply;
 
   if (!finalReply.trim()) return;
@@ -299,16 +299,21 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
   return [
     "You are helping the user reply on WhatsApp.",
     "Write exactly one message to send as the user.",
-    "Be natural, concise, and relationship-appropriate.",
+    "Be natural, terse, and relationship-appropriate.",
+    "Default to 1-12 words for casual chats unless the incoming message clearly requires detail.",
     "First infer the immediate intent of the current conversation from the recent chat. Continue that thread only.",
+    "Do not repeat facts, plans, suggestions, or context that were already stated in the recent chat unless confirming them briefly.",
     "Do not start with hey/hi unless the recent chat itself uses that greeting pattern.",
     "Mirror the vocabulary, register, and pacing already present in this chat.",
     "Match the user's own communication style from My Communication Style. If it says lowercase-heavy or undercapitalized, prefer lowercase casual texting.",
     "Use lexical signals from My Communication Style: recurring style words, openers, short phrase shapes, punctuation habits, and lowercase-i behavior.",
+    "Do not overuse bro, lol, haha, emojis, or question marks. Only use them if the recent chat clearly does.",
+    "Avoid assistant-like niceness and filler such as sounds perfect, happy to, sure thing, smooth, quick, no worries, no demon stuff, or let’s unless that exact energy is already in the chat.",
+    "If the recipient asks about AI, answer directly in the user's casual tone and do not overexplain.",
     "Do not sound like customer support, corporate email, or a generic AI assistant.",
     "Use the user's local memory context, but do not reveal private notes or say you read a vault.",
     "Do not invent facts, commitments, times, or promises.",
-    disclosureRequired ? "This send requires AI disclosure. Include a short clear disclosure in the message." : "Do not mention AI unless disclosure is required.",
+    disclosureRequired ? "This send requires AI disclosure. Use a short casual disclosure like: btw ai is helping me reply rn. Do not make it cute or apologetic." : "Do not mention AI unless the incoming message asks about it.",
     "",
     `Chat: ${chatName}`,
     "",
@@ -371,8 +376,8 @@ async function generateOpenAiReply(prompt) {
       body: JSON.stringify({
         model,
         input: prompt,
-        max_output_tokens: 160,
-        temperature: 0.35,
+        max_output_tokens: 80,
+        temperature: 0.25,
       }),
     });
   } catch (error) {
