@@ -20,6 +20,7 @@ const outboundDir = path.join(whatsAppDir, "Outbound");
 const sessionDir = path.join(whatsAppDir, ".session");
 const statePath = path.join(outboundDir, "auto-reply-state.json");
 const whitelistPath = path.join(outboundDir, "auto-reply-whitelist.json");
+const codexAppBridgeDir = path.join(outboundDir, "Codex App Bridge");
 const config = readConfig(vault);
 const provider = args.provider || config.autoReplyProvider || "ollama";
 const model = args.model || config.autoReplyModel || "llama3.1";
@@ -62,8 +63,8 @@ if (!hasInitialScope && !interactiveTerminal) {
 
 if (provider === "ollama") {
   await assertOllamaModel(model);
-} else if (!["codex"].includes(provider)) {
-  throw new Error(`Unsupported auto-reply provider "${provider}". Use "ollama" or "codex".`);
+} else if (!["codex", "codex-app"].includes(provider)) {
+  throw new Error(`Unsupported auto-reply provider "${provider}". Use "ollama", "codex", or "codex-app".`);
 }
 
 const client = new Client({
@@ -82,6 +83,7 @@ client.on("ready", async () => {
   if (!hasInitialScope) await configureInteractiveScope();
   console.log(runtimeAllowAll ? "Allowlist: all chats, with first-send approval per new chat." : allowlistSummary());
   if (provider === "codex") console.log(`Codex command: ${codexCommand}`);
+  if (provider === "codex-app") console.log(`Codex App bridge: ${codexAppBridgeDir}`);
   if (!includeBusinesses) console.log("Likely business, notification, OTP, and service chats are skipped by default.");
   try {
     if (processUnreadOnStart) {
@@ -344,6 +346,7 @@ function readMemoryContext(chatName) {
 
 async function generateReply(prompt) {
   if (provider === "codex") return generateCodexReply(prompt);
+  if (provider === "codex-app") return generateCodexAppReply(prompt);
   return generateOllamaReply(prompt);
 }
 
@@ -365,6 +368,52 @@ async function generateOllamaReply(prompt) {
 
 async function generateCodexReply(prompt) {
   return runReplyCommand(codexCommand, prompt, "codex");
+}
+
+async function generateCodexAppReply(prompt) {
+  const timeoutMs = numberArg("provider-timeout-ms", 300000);
+  const request = createCodexAppRequest(prompt);
+  console.log(`Waiting for Codex App bridge response: ${request.responsePath}`);
+  return await waitForCodexAppResponse(request.responsePath, timeoutMs);
+}
+
+function createCodexAppRequest(prompt) {
+  const requestId = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}`;
+  const requestsDir = path.join(codexAppBridgeDir, "requests");
+  const responsesDir = path.join(codexAppBridgeDir, "responses");
+  fs.mkdirSync(requestsDir, { recursive: true });
+  fs.mkdirSync(responsesDir, { recursive: true });
+  const requestPath = path.join(requestsDir, `${requestId}.json`);
+  const responsePath = path.join(responsesDir, `${requestId}.json`);
+  writeJsonAtomic(requestPath, {
+    schemaVersion: 1,
+    requestId,
+    createdAt: new Date().toISOString(),
+    responsePath,
+    prompt,
+    instructions: [
+      "Write exactly one WhatsApp reply as the user.",
+      "Return JSON only: {\"reply\":\"...\"}.",
+      "No markdown, no explanations, no surrounding text.",
+    ],
+  });
+  return { requestId, requestPath, responsePath };
+}
+
+async function waitForCodexAppResponse(responsePath, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (fs.existsSync(responsePath)) {
+      const response = parseJsonLine(fs.readFileSync(responsePath, "utf8"));
+      if (!response) throw new Error(`Codex App bridge wrote invalid JSON: ${responsePath}`);
+      if (response.error) throw new Error(`Codex App bridge error: ${response.error}`);
+      const reply = cleanReply(response.reply || "");
+      if (!reply) throw new Error(`Codex App bridge wrote an empty reply: ${responsePath}`);
+      return reply;
+    }
+    await sleep(1000);
+  }
+  throw new Error(`Codex App bridge timed out after ${timeoutMs}ms. No response at ${responsePath}`);
 }
 
 async function runReplyCommand(command, prompt, label) {
@@ -685,6 +734,10 @@ function cleanupPromptFile(file) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
 }
@@ -752,6 +805,6 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.error('Usage: digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --model llama3.1 [--yes] [--allow-all] [--include-groups] [--include-businesses]');
+  console.error('Usage: digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|codex|codex-app --model llama3.1 [--yes] [--allow-all] [--include-groups] [--include-businesses]');
   process.exit(1);
 }

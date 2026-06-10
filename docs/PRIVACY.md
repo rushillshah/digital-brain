@@ -7,7 +7,7 @@ Digital Brain is designed for local use.
 - No cloud API is called by default.
 - Ollama interpretation is local when enabled.
 - WhatsApp sending uses a local WhatsApp Web session.
-- WhatsApp auto-reply uses local Ollama by default or a configured local Codex command, runs only while the command is active, and requires an allowlist unless explicitly overridden. If init is configured for auto-send mode, it can send without `--yes`.
+- WhatsApp auto-reply uses local Ollama by default, a configured local Codex command, or a Codex desktop file bridge. It runs only while the command is active and requires an allowlist unless explicitly overridden. If init is configured for auto-send mode, it can send without `--yes`.
 - Raw source data stays under `08 Sources/`; normal AI context should use `06 AI Memory/` and human notes under `04 People/`.
 - Same-person matching across sources is provisional and file-based; keep source evidence visible when using merged person context.
 

@@ -104,6 +104,7 @@ Draft-only:
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
 digital-brain auto-whatsapp --allow-all --provider codex
+digital-brain auto-whatsapp --allow-all --provider codex-app
 ```
 
 Auto-send while the command is running:
@@ -112,6 +113,7 @@ Auto-send while the command is running:
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1 --yes
 digital-brain auto-whatsapp --allow-all --provider codex --yes
+digital-brain auto-whatsapp --allow-all --provider codex-app --yes
 ```
 
 Broad auto-send for personal chats:
@@ -129,10 +131,13 @@ Provider options:
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --provider ollama --model llama3.1 --yes
 digital-brain auto-whatsapp --allow "Mom" --provider codex --yes
+digital-brain auto-whatsapp --allow "Mom" --provider codex-app --yes
 digital-brain auto-whatsapp --allow "Mom" --provider codex --codex-command "codex exec --skip-git-repo-check" --yes
 ```
 
 `--provider codex` runs a local Codex command. If `--codex-command` contains `{promptFile}`, Digital Brain writes the prompt to a temp file and substitutes the path; otherwise it pipes the prompt to stdin.
+
+`--provider codex-app` does not use the Codex CLI. It writes request JSON files to `08 Sources/WhatsApp/Outbound/Codex App Bridge/requests` and waits for response JSON files in `responses`. A Codex desktop automation or live Codex thread must process those request files and write `{"reply":"..."}` to the provided `responsePath`.
 
 If you selected `Auto-send while running` during init, `auto-whatsapp` can send without `--yes` while it is running:
 
@@ -145,6 +150,7 @@ Guardrails:
 - with `--provider ollama`, requires Ollama running locally
 - with `--provider ollama`, requires the selected model, for example `ollama pull llama3.1`
 - with `--provider codex`, requires a working local Codex command
+- with `--provider codex-app`, requires a Codex desktop bridge automation/thread that writes response files
 - requires `--allow "Name"` or `--contact "+15551234567"` unless `--allow-all` is explicitly passed
 - single-threads reply generation so multiple incoming chats do not trigger overlapping sends
 - skips likely business, notification, OTP, and service chats unless `--include-businesses` is passed or the chat is explicitly allowlisted by name or contact number

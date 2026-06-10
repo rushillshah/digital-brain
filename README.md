@@ -99,6 +99,7 @@ digital-brain send-whatsapp --to "Name" --message "text"
 digital-brain auto-whatsapp --allow "Name" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
 digital-brain auto-whatsapp --allow-all --provider codex --yes
+digital-brain auto-whatsapp --allow-all --provider codex-app --yes
 ```
 
 `init` remembers your vault globally, so `run` works from anywhere. `run` syncs the live local sources you selected, extracts relationships, and writes interpreted memory in one command.
@@ -126,19 +127,28 @@ digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes --no-process-unread
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1 --yes
 digital-brain auto-whatsapp --allow-all --provider codex --yes
+digital-brain auto-whatsapp --allow-all --provider codex-app --yes
 ```
 
 If you start without `--allow`, `--contact`, or `--allow-all` in an interactive terminal, Digital Brain asks whether to cover all contacts or select contacts from your WhatsApp chat list. With `--allow-all`, it still asks once before the first AI reply to each new chat and stores the decision in `08 Sources/WhatsApp/Outbound/auto-reply-whitelist.json`. Use `--auto-approve-new-chats` only if you intentionally want unattended first sends.
 
 Even with `--allow-all`, likely business, notification, OTP, delivery, bank, and support chats are skipped by default. Use explicit `--allow "Name"` or `--contact "+15551234567"` for trusted personal chats. Pass `--include-businesses` only if you intentionally want those chats included.
 
-The default provider is local Ollama. To use Codex instead:
+The default provider is local Ollama. `--provider codex` uses the Codex CLI. `--provider codex-app` uses a file bridge for the Codex desktop app.
 
 ```bash
 digital-brain auto-whatsapp --allow-all --provider codex --yes
 ```
 
 If your Codex CLI needs a custom command, pass `--codex-command "..."` or set `DIGITAL_BRAIN_CODEX_COMMAND`. If the command contains `{promptFile}`, Digital Brain writes the reply prompt to a temp file and substitutes that path; otherwise it pipes the prompt to stdin.
+
+For the Codex desktop app bridge:
+
+```bash
+digital-brain auto-whatsapp --allow-all --provider codex-app --yes
+```
+
+Digital Brain writes requests to `08 Sources/WhatsApp/Outbound/Codex App Bridge/requests` and waits for matching JSON responses in `responses`.
 
 If Digital Brain has already sent two AI-assisted messages to the same chat in the last 24 hours, the next send must disclose that AI is helping. Once that chat has received an AI disclosure, Digital Brain will not keep repeating it.
 
