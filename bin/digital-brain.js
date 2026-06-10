@@ -9,6 +9,14 @@ import { copyDir, ensureDir, packageRoot, resolveVault, writeDefaultVault } from
 
 const root = packageRoot(import.meta.url);
 const CONFIG_SCHEMA_VERSION = 1;
+const PROVIDERS = {
+  ollama: { label: "Ollama local model", model: "llama3.1", icon: "🦙" },
+  openai: { label: "OpenAI API", model: "gpt-4.1-mini", keyEnv: "OPENAI_API_KEY", keyField: "openaiApiKey", keyArg: "openai-api-key", modelArg: "openai-model", icon: "⚡" },
+  anthropic: { label: "Anthropic API", model: "claude-sonnet-4-6", keyEnv: "ANTHROPIC_API_KEY", keyField: "anthropicApiKey", keyArg: "anthropic-api-key", modelArg: "anthropic-model", icon: "🔶" },
+  xai: { label: "xAI API", model: "grok-4.3", keyEnv: "XAI_API_KEY", keyField: "xaiApiKey", keyArg: "xai-api-key", modelArg: "xai-model", icon: "✕" },
+  "codex-app": { label: "Codex app bridge", icon: "🧠" },
+  codex: { label: "Codex CLI", icon: "⌨️" },
+};
 
 main().catch((error) => {
   console.error(error.message);
@@ -54,7 +62,9 @@ async function init(argv, args) {
   let outboundMode = args["outbound-mode"] || "draft";
   let autoReplyProvider = args["auto-reply-provider"] || args.provider || "ollama";
   let openaiApiKey = args["openai-api-key"] || "";
-  let openaiModel = args["openai-model"] || "gpt-4.1-mini";
+  let anthropicApiKey = args["anthropic-api-key"] || "";
+  let xaiApiKey = args["xai-api-key"] || "";
+  let autoReplyModel = args.model || providerSpecificModelArg(args, autoReplyProvider) || defaultModelForProvider(autoReplyProvider);
   let privacyMode = args["privacy-mode"] || "standard";
   let sourceMarkdownMode = args["source-markdown-mode"] || "none";
   let selectedSources = parseList(args.sources || "whatsapp");
@@ -115,15 +125,24 @@ async function init(argv, args) {
       autoReplyProvider = await select(rl, "WhatsApp auto-reply brain", [
         ["ollama", "Ollama local model", "Runs fully local if Ollama and the model are installed.", "🦙"],
         ["openai", "OpenAI API", "Fast hosted replies using the same Digital Brain context prompt.", "⚡"],
+        ["anthropic", "Anthropic API", "Hosted Claude replies using the same Digital Brain context prompt.", "🔶"],
+        ["xai", "xAI API", "Hosted Grok replies using the same Digital Brain context prompt.", "✕"],
         ["codex-app", "Codex app bridge", "Uses request/response files for a Codex desktop automation or thread.", "🧠"],
         ["codex", "Codex CLI", "Uses a local codex command; only choose this if the CLI works.", "⌨️"],
       ], autoReplyProvider);
-      if (autoReplyProvider === "openai") {
-        openaiModel = await ask(rl, "🤖 OpenAI model", openaiModel);
-        openaiApiKey = await askSecret(rl, "🔑 OpenAI API key", {
-          fallbackLabel: process.env.OPENAI_API_KEY ? "OPENAI_API_KEY env found" : "use OPENAI_API_KEY at runtime",
-          helpText: "Paste a key to store it locally in this vault config. Leave blank to use OPENAI_API_KEY at runtime.",
+      const providerMeta = PROVIDERS[autoReplyProvider];
+      if (!args.model && !providerSpecificModelArg(args, autoReplyProvider)) {
+        autoReplyModel = defaultModelForProvider(autoReplyProvider);
+      }
+      if (providerMeta?.keyEnv) {
+        autoReplyModel = await ask(rl, `🤖 ${providerMeta.label} model`, autoReplyModel || providerMeta.model);
+        const apiKey = await askSecret(rl, `🔑 ${providerMeta.label} key`, {
+          fallbackLabel: process.env[providerMeta.keyEnv] ? `${providerMeta.keyEnv} env found` : `use ${providerMeta.keyEnv} at runtime`,
+          helpText: `Paste a key to store it locally in this vault config. Leave blank to use ${providerMeta.keyEnv} at runtime.`,
         });
+        if (autoReplyProvider === "openai") openaiApiKey = apiKey;
+        if (autoReplyProvider === "anthropic") anthropicApiKey = apiKey;
+        if (autoReplyProvider === "xai") xaiApiKey = apiKey;
       }
     }
     connectAi = await confirm(rl, "🔗 Add global AI pointers for Codex/Claude/Gemini?", true);
@@ -154,8 +173,10 @@ async function init(argv, args) {
     timezone,
     outboundMode,
     autoReplyProvider,
-    autoReplyModel: autoReplyProvider === "openai" ? openaiModel : args.model || undefined,
+    autoReplyModel: providerUsesModel(autoReplyProvider) ? autoReplyModel : undefined,
     openaiApiKey: autoReplyProvider === "openai" && openaiApiKey ? openaiApiKey : undefined,
+    anthropicApiKey: autoReplyProvider === "anthropic" && anthropicApiKey ? anthropicApiKey : undefined,
+    xaiApiKey: autoReplyProvider === "xai" && xaiApiKey ? xaiApiKey : undefined,
     privacyMode,
     sourceMarkdownMode,
     selectedSources,
@@ -201,6 +222,12 @@ async function init(argv, args) {
   }
   if (autoReplyProvider === "openai" && !openaiApiKey && !process.env.OPENAI_API_KEY) {
     console.log("OpenAI provider selected. Set OPENAI_API_KEY before running auto-whatsapp, or add openaiApiKey to the vault config.");
+  }
+  if (autoReplyProvider === "anthropic" && !anthropicApiKey && !process.env.ANTHROPIC_API_KEY) {
+    console.log("Anthropic provider selected. Set ANTHROPIC_API_KEY before running auto-whatsapp, or add anthropicApiKey to the vault config.");
+  }
+  if (autoReplyProvider === "xai" && !xaiApiKey && !process.env.XAI_API_KEY) {
+    console.log("xAI provider selected. Set XAI_API_KEY before running auto-whatsapp, or add xaiApiKey to the vault config.");
   }
   console.log("Next:");
   console.log("  digital-brain run");
@@ -390,6 +417,22 @@ function printSetupCheck(vault, options = {}) {
       ok: Boolean(process.env.OPENAI_API_KEY || config.openaiApiKey),
       value: process.env.OPENAI_API_KEY ? "found in OPENAI_API_KEY" : config.openaiApiKey ? "stored in vault config" : "not found",
       hint: "Set OPENAI_API_KEY or re-run init and choose OpenAI API.",
+    });
+  }
+  if (config.autoReplyProvider === "anthropic") {
+    checks.push({
+      label: "Anthropic API key",
+      ok: Boolean(process.env.ANTHROPIC_API_KEY || config.anthropicApiKey),
+      value: process.env.ANTHROPIC_API_KEY ? "found in ANTHROPIC_API_KEY" : config.anthropicApiKey ? "stored in vault config" : "not found",
+      hint: "Set ANTHROPIC_API_KEY or re-run init and choose Anthropic API.",
+    });
+  }
+  if (config.autoReplyProvider === "xai") {
+    checks.push({
+      label: "xAI API key",
+      ok: Boolean(process.env.XAI_API_KEY || config.xaiApiKey),
+      value: process.env.XAI_API_KEY ? "found in XAI_API_KEY" : config.xaiApiKey ? "stored in vault config" : "not found",
+      hint: "Set XAI_API_KEY or re-run init and choose xAI API.",
     });
   }
   if (selectedSources.includes("whatsapp")) {
@@ -719,6 +762,19 @@ function parseList(value) {
   return String(value).split(",").map((item) => item.trim()).filter(Boolean);
 }
 
+function defaultModelForProvider(provider) {
+  return PROVIDERS[provider]?.model || PROVIDERS.ollama.model;
+}
+
+function providerSpecificModelArg(args, provider) {
+  const key = PROVIDERS[provider]?.modelArg;
+  return key ? args[key] : "";
+}
+
+function providerUsesModel(provider) {
+  return Boolean(PROVIDERS[provider]?.model);
+}
+
 function toBoolean(value) {
   if (value === undefined) return false;
   if (value === true) return true;
@@ -746,7 +802,7 @@ Usage:
   digital-brain extract --days 30
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]
-  digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|codex|codex-app --model llama3.1 [--yes] [--no-process-unread]
+  digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|anthropic|xai|codex|codex-app --model llama3.1 [--yes] [--no-process-unread]
   digital-brain pause-whatsapp [--chat "Name"]
   digital-brain resume-whatsapp [--chat "Name"]
   digital-brain whatsapp-status

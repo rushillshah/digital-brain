@@ -8,6 +8,13 @@ import qrcode from "qrcode-terminal";
 import pkg from "whatsapp-web.js";
 
 const { Client, LocalAuth } = pkg;
+const DEFAULT_PROVIDER_MODELS = {
+  ollama: "llama3.1",
+  openai: "gpt-4.1-mini",
+  anthropic: "claude-sonnet-4-6",
+  xai: "grok-4.3",
+};
+const SUPPORTED_PROVIDERS = ["ollama", "openai", "anthropic", "xai", "codex", "codex-app"];
 const BUSINESS_NAME_RE = /\b(amazon|flipkart|myntra|nykaa|swiggy|zomato|blinkit|zepto|uber|ola|rapido|delivery|courier|dunzo|paytm|phonepe|gpay|google pay|hdfc|icici|sbi|axis|kotak|amex|bank|airtel|jio|vodafone|vi|support|helpdesk|customer care|official|verified|business|meta ai|whatsapp|no[\s-]?reply|noreply|otp|login|security|alerts?|notifications?|offers?|promo|marketing)\b/i;
 const BUSINESS_BODY_RE = /\b(otp|one time password|verification code|login code|security code|do not share|order|delivered|delivery|shipment|tracking|invoice|payment|transaction|debited|credited|refund|ticket|support|unsubscribe|offer|coupon|sale|valid till|automated message)\b/i;
 const args = parseArgs(process.argv.slice(2));
@@ -24,9 +31,11 @@ const pausePath = path.join(outboundDir, "auto-reply-pause.json");
 const codexAppBridgeDir = path.join(outboundDir, "Codex App Bridge");
 const config = readConfig(vault);
 const provider = args.provider || config.autoReplyProvider || "ollama";
-const model = args.model || config.autoReplyModel || (provider === "openai" ? "gpt-4.1-mini" : "llama3.1");
+const model = args.model || config.autoReplyModel || defaultModelForProvider(provider);
 const codexCommand = args["codex-command"] || process.env.DIGITAL_BRAIN_CODEX_COMMAND || config.codexCommand || "codex exec --skip-git-repo-check";
 const openaiApiKey = args["openai-api-key"] || process.env.OPENAI_API_KEY || config.openaiApiKey || "";
+const anthropicApiKey = args["anthropic-api-key"] || process.env.ANTHROPIC_API_KEY || config.anthropicApiKey || "";
+const xaiApiKey = args["xai-api-key"] || process.env.XAI_API_KEY || config.xaiApiKey || "";
 const allow = parseList(args.allow || "");
 const deny = parseList(args.deny || "");
 const contactNumbers = parseList([args.contact, args.phone, args["contact-number"]].filter(Boolean).join(","))
@@ -70,8 +79,12 @@ if (provider === "ollama") {
   await assertOllamaModel(model);
 } else if (provider === "openai") {
   assertOpenAiConfig();
+} else if (provider === "anthropic") {
+  assertAnthropicConfig();
+} else if (provider === "xai") {
+  assertXaiConfig();
 } else if (!["codex", "codex-app"].includes(provider)) {
-  throw new Error(`Unsupported auto-reply provider "${provider}". Use "ollama", "openai", "codex", or "codex-app".`);
+  throw new Error(`Unsupported auto-reply provider "${provider}". Use ${SUPPORTED_PROVIDERS.map((item) => `"${item}"`).join(", ")}.`);
 }
 
 const client = new Client({
@@ -85,7 +98,7 @@ client.on("qr", (qr) => {
 });
 
 client.on("ready", async () => {
-  console.log(`Digital Brain WhatsApp auto-reply running with provider: ${provider}${["ollama", "openai"].includes(provider) ? ` (${model})` : ""}`);
+  console.log(`Digital Brain WhatsApp auto-reply running with provider: ${provider}${providerUsesModel(provider) ? ` (${model})` : ""}`);
   console.log(sendEnabled ? "Auto-send is enabled." : "Draft mode. Replies will be logged but not sent. Add --yes or set outboundMode=auto-send to send.");
   if (!hasInitialScope) await configureInteractiveScope();
   console.log(runtimeAllowAll ? "Allowlist: all chats, with first-send approval per new chat." : allowlistSummary());
@@ -421,20 +434,40 @@ async function generateReply(prompt) {
   if (provider === "codex") return generateCodexReply(prompt);
   if (provider === "codex-app") return generateCodexAppReply(prompt);
   if (provider === "openai") return generateOpenAiReply(prompt);
+  if (provider === "anthropic") return generateAnthropicReply(prompt);
+  if (provider === "xai") return generateXaiReply(prompt);
   return generateOllamaReply(prompt);
 }
 
 async function generateOpenAiReply(prompt) {
+  return generateResponsesApiReply({
+    providerName: "OpenAI",
+    url: "https://api.openai.com/v1/responses",
+    apiKey: openaiApiKey,
+    prompt,
+  });
+}
+
+async function generateXaiReply(prompt) {
+  return generateResponsesApiReply({
+    providerName: "xAI",
+    url: "https://api.x.ai/v1/responses",
+    apiKey: xaiApiKey,
+    prompt,
+  });
+}
+
+async function generateResponsesApiReply({ providerName, url, apiKey, prompt }) {
   const timeoutMs = numberArg("provider-timeout-ms", 45000);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
-    response = await fetch("https://api.openai.com/v1/responses", {
+    response = await fetch(url, {
       method: "POST",
       signal: controller.signal,
       headers: {
-        "authorization": `Bearer ${openaiApiKey}`,
+        "authorization": `Bearer ${apiKey}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({
@@ -445,16 +478,51 @@ async function generateOpenAiReply(prompt) {
       }),
     });
   } catch (error) {
-    if (error.name === "AbortError") throw new Error(`OpenAI reply timed out after ${timeoutMs}ms`);
+    if (error.name === "AbortError") throw new Error(`${providerName} reply timed out after ${timeoutMs}ms`);
     throw error;
   } finally {
     clearTimeout(timer);
   }
   const text = await response.text();
-  if (!response.ok) throw new Error(`OpenAI reply failed: ${response.status} ${summarize(text)}`);
+  if (!response.ok) throw new Error(`${providerName} reply failed: ${response.status} ${summarize(text)}`);
   const body = parseJsonLine(text);
   const reply = extractOpenAiText(body);
-  if (!reply) throw new Error("OpenAI returned an empty reply.");
+  if (!reply) throw new Error(`${providerName} returned an empty reply.`);
+  return cleanReply(reply);
+}
+
+async function generateAnthropicReply(prompt) {
+  const timeoutMs = numberArg("provider-timeout-ms", 45000);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "x-api-key": anthropicApiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 80,
+        temperature: 0.25,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error(`Anthropic reply timed out after ${timeoutMs}ms`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+  const text = await response.text();
+  if (!response.ok) throw new Error(`Anthropic reply failed: ${response.status} ${summarize(text)}`);
+  const body = parseJsonLine(text);
+  const reply = extractAnthropicText(body);
+  if (!reply) throw new Error("Anthropic returned an empty reply.");
   return cleanReply(reply);
 }
 
@@ -579,6 +647,18 @@ function assertOpenAiConfig() {
   }
 }
 
+function assertAnthropicConfig() {
+  if (!anthropicApiKey) {
+    throw new Error("Anthropic provider requires an API key. Set ANTHROPIC_API_KEY, pass --anthropic-api-key, or re-run init and enter the key.");
+  }
+}
+
+function assertXaiConfig() {
+  if (!xaiApiKey) {
+    throw new Error("xAI provider requires an API key. Set XAI_API_KEY, pass --xai-api-key, or re-run init and enter the key.");
+  }
+}
+
 function extractOpenAiText(body) {
   if (!body) return "";
   if (typeof body.output_text === "string") return body.output_text;
@@ -589,6 +669,23 @@ function extractOpenAiText(body) {
     }
   }
   return chunks.join(" ");
+}
+
+function extractAnthropicText(body) {
+  if (!body) return "";
+  const chunks = [];
+  for (const content of body.content || []) {
+    if (content.type === "text" && typeof content.text === "string") chunks.push(content.text);
+  }
+  return chunks.join(" ");
+}
+
+function defaultModelForProvider(providerName) {
+  return DEFAULT_PROVIDER_MODELS[providerName] || DEFAULT_PROVIDER_MODELS.ollama;
+}
+
+function providerUsesModel(providerName) {
+  return ["ollama", "openai", "anthropic", "xai"].includes(providerName);
 }
 
 function cleanReply(value) {

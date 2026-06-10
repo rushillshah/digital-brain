@@ -151,6 +151,48 @@ test("init can configure OpenAI auto-reply provider and key", () => {
   assert.equal(config.openaiApiKey, "test-openai-key");
 });
 
+test("init can configure Anthropic auto-reply provider and key", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  run([
+    cli,
+    "init",
+    vault,
+    "--yes",
+    "--auto-reply-provider",
+    "anthropic",
+    "--anthropic-api-key",
+    "test-anthropic-key",
+    "--connect-ai=false",
+  ], { HOME: testHome(root) });
+
+  const config = readJson(path.join(vault, "digital-brain.config.json"));
+  assert.equal(config.autoReplyProvider, "anthropic");
+  assert.equal(config.autoReplyModel, "claude-sonnet-4-6");
+  assert.equal(config.anthropicApiKey, "test-anthropic-key");
+});
+
+test("init can configure xAI auto-reply provider and key", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  run([
+    cli,
+    "init",
+    vault,
+    "--yes",
+    "--auto-reply-provider",
+    "xai",
+    "--xai-api-key",
+    "test-xai-key",
+    "--connect-ai=false",
+  ], { HOME: testHome(root) });
+
+  const config = readJson(path.join(vault, "digital-brain.config.json"));
+  assert.equal(config.autoReplyProvider, "xai");
+  assert.equal(config.autoReplyModel, "grok-4.3");
+  assert.equal(config.xaiApiKey, "test-xai-key");
+});
+
 test("noninteractive auto-send init requires responsibility acceptance", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
@@ -354,6 +396,12 @@ test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", ()
   assert.match(source, /btw ai is helping me reply rn/);
   assert.match(source, /max_output_tokens: 80/);
   assert.match(source, /temperature: 0.25/);
+  assert.match(source, /claude-sonnet-4-6/);
+  assert.match(source, /grok-4\.3/);
+  assert.match(source, /ANTHROPIC_API_KEY/);
+  assert.match(source, /XAI_API_KEY/);
+  assert.match(source, /https:\/\/api\.anthropic\.com\/v1\/messages/);
+  assert.match(source, /https:\/\/api\.x\.ai\/v1\/responses/);
 });
 
 test("auto-reply allows explicitly whitelisted groups by name", () => {

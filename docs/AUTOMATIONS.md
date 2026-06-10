@@ -31,7 +31,7 @@ digital-brain run
 - refresh interval in minutes for always-on mode, clamped to a minimum of 1
 - active time window
 - WhatsApp outbound mode
-- WhatsApp auto-reply provider: Ollama, Codex app bridge, or Codex CLI
+- WhatsApp auto-reply provider: Ollama, OpenAI API, Anthropic API, xAI API, Codex app bridge, or Codex CLI
 - whether to add AI adapter pointers
 
 Most questions are multiple choice. Pick with `A/B/C`, `1/2/3`, the exact value, or press Enter to use the displayed default.
@@ -98,7 +98,7 @@ The generated script loops forever and sleeps for `refreshIntervalMinutes`. The 
 
 ## WhatsApp Auto-Reply
 
-`digital-brain auto-whatsapp` is separate from refresh automation. It uses WhatsApp Web for live incoming messages and Ollama, OpenAI, or Codex for reply generation. On startup it scans unread WhatsApp Web chats, then continues listening for new messages.
+`digital-brain auto-whatsapp` is separate from refresh automation. It uses WhatsApp Web for live incoming messages and Ollama, OpenAI, Anthropic, xAI, or Codex for reply generation. On startup it scans unread WhatsApp Web chats, then continues listening for new messages.
 
 Draft-only:
 
@@ -106,6 +106,8 @@ Draft-only:
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
 OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini
+ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow-all --provider anthropic
+XAI_API_KEY="xai-..." digital-brain auto-whatsapp --allow-all --provider xai
 digital-brain auto-whatsapp --allow-all --provider codex
 digital-brain auto-whatsapp --allow-all --provider codex-app
 ```
@@ -116,6 +118,8 @@ Auto-send while the command is running:
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1 --yes
 OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini --yes
+ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow-all --provider anthropic --yes
+XAI_API_KEY="xai-..." digital-brain auto-whatsapp --allow-all --provider xai --yes
 digital-brain auto-whatsapp --allow-all --provider codex --yes
 digital-brain auto-whatsapp --allow-all --provider codex-app --yes
 ```
@@ -135,12 +139,18 @@ Provider options:
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --provider ollama --model llama3.1 --yes
 OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow "Mom" --provider openai --model gpt-4.1-mini --yes
+ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow "Mom" --provider anthropic --yes
+XAI_API_KEY="xai-..." digital-brain auto-whatsapp --allow "Mom" --provider xai --yes
 digital-brain auto-whatsapp --allow "Mom" --provider codex --yes
 digital-brain auto-whatsapp --allow "Mom" --provider codex-app --yes
 digital-brain auto-whatsapp --allow "Mom" --provider codex --codex-command "codex exec --skip-git-repo-check" --yes
 ```
 
 `--provider openai` sends the same Digital Brain prompt and relevant vault context to the OpenAI API. Set `OPENAI_API_KEY`, pass `--openai-api-key`, or choose OpenAI during `digital-brain init` and paste the key into the local vault config.
+
+`--provider anthropic` uses Anthropic's Messages API with default model `claude-sonnet-4-6`. Set `ANTHROPIC_API_KEY`, pass `--anthropic-api-key`, or choose Anthropic during `digital-brain init` and paste the key into the local vault config.
+
+`--provider xai` uses xAI's OpenAI-compatible Responses API with default model `grok-4.3`. Set `XAI_API_KEY`, pass `--xai-api-key`, or choose xAI during `digital-brain init` and paste the key into the local vault config.
 
 Pause/resume while `auto-whatsapp` is running:
 
@@ -171,6 +181,8 @@ Guardrails:
 - with `--provider ollama`, requires Ollama running locally
 - with `--provider ollama`, requires the selected model, for example `ollama pull llama3.1`
 - with `--provider openai`, requires `OPENAI_API_KEY`, `--openai-api-key`, or `openaiApiKey` in the vault config
+- with `--provider anthropic`, requires `ANTHROPIC_API_KEY`, `--anthropic-api-key`, or `anthropicApiKey` in the vault config
+- with `--provider xai`, requires `XAI_API_KEY`, `--xai-api-key`, or `xaiApiKey` in the vault config
 - with `--provider codex`, requires a working local Codex command
 - with `--provider codex-app`, requires a Codex desktop bridge automation/thread that writes response files
 - requires `--allow "Name"` or `--contact "+15551234567"` unless `--allow-all` is explicitly passed
