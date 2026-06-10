@@ -338,6 +338,9 @@ test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", ()
   assert.match(source, /reply-debounce-ms", 12000/);
   assert.match(source, /answer the combined latest intent once/);
   assert.match(source, /do not pretend you opened or inspected it/);
+  assert.match(source, /Primary style source: the user's recent messages in this exact chat/);
+  assert.match(source, /Do not perform a persona/);
+  assert.match(source, /Recent examples of the user's own messages in this chat/);
   assert.match(source, /Do not repeat facts, plans, suggestions, or context/);
   assert.match(source, /Avoid assistant-like niceness and filler/);
   assert.match(source, /btw ai is helping me reply rn/);

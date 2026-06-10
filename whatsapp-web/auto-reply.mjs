@@ -309,6 +309,11 @@ async function handleMessage(message, knownChat = null) {
 
 function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequired }) {
   const memory = readMemoryContext(chatName);
+  const selfExamples = recentMessages
+    .filter((item) => item.fromMe && compact(item.body || ""))
+    .slice(-6)
+    .map((item) => `- ${compact(item.body || "")}`)
+    .join("\n") || "- No recent self examples in this chat.";
   const transcript = recentMessages
     .slice(-12)
     .map((item) => `${item.fromMe ? "Me" : chatName}: ${compact(item.body || "")}`)
@@ -323,10 +328,10 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "Do not repeat facts, plans, suggestions, or context that were already stated in the recent chat unless confirming them briefly.",
     "If the chat includes a URL, do not pretend you opened or inspected it. React only to what the sender said, or ask if the user should check it.",
     "Do not start with hey/hi unless the recent chat itself uses that greeting pattern.",
-    "Mirror the vocabulary, register, and pacing already present in this chat.",
-    "Match the user's own communication style from My Communication Style. If it says lowercase-heavy or undercapitalized, prefer lowercase casual texting.",
-    "Use lexical signals from My Communication Style: recurring style words, openers, short phrase shapes, punctuation habits, and lowercase-i behavior.",
-    "Do not overuse bro, lol, haha, emojis, or question marks. Only use them if the recent chat clearly does.",
+    "Primary style source: the user's recent messages in this exact chat. Match their length, casing, bluntness, and punctuation from those examples.",
+    "Secondary style source: My Communication Style. Use it only to break ties, not to add extra slang.",
+    "Do not perform a persona. Do not intensify the tone beyond the user's examples.",
+    "Do not force bro, lol, haha, lmao, wild, rn, emojis, or question marks. Use them only if the user's recent examples in this chat use them naturally.",
     "Avoid assistant-like niceness and filler such as sounds perfect, happy to, sure thing, smooth, quick, no worries, no demon stuff, digital prep chef, digital neil, spitting facts, living in the future, or let’s unless that exact energy is already in the chat.",
     "If the recipient asks about AI, answer directly in the user's casual tone and do not overexplain.",
     "Do not sound like customer support, corporate email, or a generic AI assistant.",
@@ -341,6 +346,9 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "",
     "Recent chat:",
     transcript,
+    "",
+    "Recent examples of the user's own messages in this chat:",
+    selfExamples,
     "",
     `Incoming message: ${incomingBody}`,
     "",
