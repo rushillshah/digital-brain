@@ -86,6 +86,7 @@ def teams_record(item, file_path, source_root, self_name, self_email, privacy_mo
         return None
     author = message_author(item)
     author_email = message_author_email(item)
+    author_metadata = message_author_metadata(item)
     from_me = is_self(author, author_email, self_name, self_email)
     chat_name = message_chat_name(item, file_path, source_root)
     chat_id = item.get("chatId") or nested_get(item, "chat", "id") or nested_get(item, "channelIdentity", "channelId") or chat_name
@@ -106,6 +107,7 @@ def teams_record(item, file_path, source_root, self_name, self_email, privacy_mo
         "author": self_name if from_me and self_name else author,
         "authorId": nested_get(item, "from", "user", "id") or nested_get(item, "from", "application", "id") or "",
         "authorEmail": author_email,
+        "authorMetadata": author_metadata,
         "replyToId": item.get("replyToId") or "",
         "messageType": item.get("messageType") or item.get("type") or "",
         "body": "" if privacy_mode == "metadata-only" else body,
@@ -141,6 +143,24 @@ def message_author_email(item):
     if isinstance(user, dict):
         return user.get("email") or user.get("userPrincipalName") or ""
     return item.get("authorEmail") or item.get("senderEmail") or ""
+
+
+def message_author_metadata(item):
+    user = nested_get(item, "from", "user")
+    if not isinstance(user, dict):
+        user = {}
+    metadata = {
+        "jobTitle": user.get("jobTitle") or item.get("authorJobTitle") or item.get("jobTitle") or "",
+        "department": user.get("department") or item.get("authorDepartment") or item.get("department") or "",
+        "company": user.get("companyName") or item.get("authorCompany") or item.get("companyName") or "",
+        "officeLocation": user.get("officeLocation") or item.get("officeLocation") or "",
+        "email": user.get("email") or user.get("userPrincipalName") or item.get("authorEmail") or "",
+        "userPrincipalName": user.get("userPrincipalName") or "",
+        "userIdentityType": user.get("userIdentityType") or nested_get(item, "from", "user", "userIdentityType") or "",
+        "teamId": nested_get(item, "channelIdentity", "teamId") or item.get("teamId") or "",
+        "channelId": nested_get(item, "channelIdentity", "channelId") or item.get("channelId") or "",
+    }
+    return {key: value for key, value in metadata.items() if value not in ("", None)}
 
 
 def message_chat_name(item, file_path, source_root):

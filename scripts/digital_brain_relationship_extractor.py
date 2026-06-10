@@ -99,6 +99,7 @@ def profile_chat(chat_key, messages):
     outbound_messages = [m for m in messages if m.get("fromMe") and (m.get("body") or "").strip()]
     role_evidence = extract_role_evidence(messages)
     role_scores = role_evidence_scores(role_evidence)
+    metadata_signals = extract_metadata_signals(messages)
     words = Counter(re.findall(r"[a-zA-Z']+", text.lower()))
     positive = score(words, POSITIVE)
     negative = score(words, NEGATIVE)
@@ -134,6 +135,7 @@ def profile_chat(chat_key, messages):
         "relationshipGuess": guess,
         "roleEvidence": role_evidence,
         "roleEvidenceScores": role_scores,
+        "metadataSignals": metadata_signals,
         "tags": tags,
         "typingStyle": typing_style(outbound_messages),
     }
@@ -180,6 +182,7 @@ def infer_relationship(tags, count, warmth, friction, operational, work, balance
 def extract_role_evidence(messages):
     evidence = []
     seen = set()
+    add_metadata_evidence(evidence, seen, messages)
     for message in messages:
         body = (message.get("body") or "").strip()
         if not body:
@@ -193,6 +196,85 @@ def extract_role_evidence(messages):
         if len(evidence) >= 24:
             break
     return evidence[:12]
+
+
+def add_metadata_evidence(evidence, seen, messages):
+    for message in messages:
+        if message.get("fromMe"):
+            continue
+        metadata = message.get("authorMetadata") or {}
+        if not isinstance(metadata, dict):
+            continue
+        parts = [
+            metadata.get("title") or metadata.get("jobTitle") or "",
+            metadata.get("department") or "",
+            metadata.get("company") or "",
+            email_domain(metadata.get("email") or metadata.get("userPrincipalName") or ""),
+        ]
+        text = " ".join(str(part) for part in parts if part)
+        normalized = normalize_message(text)
+        if not normalized:
+            continue
+        if re.search(r"\b(founder|cofounder|ceo|cto|cpo|coo|vp|head|lead|manager|director|engineer|developer|designer|product|sales|marketing|ops|operations|intern|analyst|consultant|partner)\b", normalized):
+            add_role_evidence(evidence, seen, "work collaborator", "profile metadata role/title", 3, text, "metadata")
+        elif metadata.get("email") or metadata.get("userPrincipalName"):
+            add_role_evidence(evidence, seen, "work collaborator", "profile metadata email/domain", 1, text, "metadata")
+        if len(evidence) >= 8:
+            break
+
+
+def extract_metadata_signals(messages):
+    titles = Counter()
+    departments = Counter()
+    companies = Counter()
+    domains = Counter()
+    flags = Counter()
+    for message in messages:
+        if message.get("fromMe"):
+            continue
+        metadata = message.get("authorMetadata") or {}
+        if not isinstance(metadata, dict):
+            continue
+        for value in compact_metadata_values(metadata.get("title"), metadata.get("jobTitle")):
+            titles[value] += 1
+        for value in compact_metadata_values(metadata.get("department")):
+            departments[value] += 1
+        for value in compact_metadata_values(metadata.get("company")):
+            companies[value] += 1
+        domain = email_domain(metadata.get("email") or metadata.get("userPrincipalName") or "")
+        if domain:
+            domains[domain] += 1
+        for flag in ("isAdmin", "isOwner", "isBot", "userIdentityType"):
+            value = metadata.get(flag)
+            if value not in ("", None, False):
+                flags[f"{flag}={value}"] += 1
+    return {
+        "titles": top_counter(titles),
+        "departments": top_counter(departments),
+        "companies": top_counter(companies),
+        "emailDomains": top_counter(domains),
+        "flags": top_counter(flags),
+    }
+
+
+def compact_metadata_values(*values):
+    out = []
+    for value in values:
+        cleaned = " ".join(str(value or "").split()).strip()
+        if cleaned:
+            out.append(cleaned[:80])
+    return out
+
+
+def email_domain(value):
+    text = str(value or "").strip().lower()
+    if "@" not in text:
+        return ""
+    return text.rsplit("@", 1)[-1]
+
+
+def top_counter(counter, limit=5):
+    return [{"value": value, "count": count} for value, count in counter.most_common(limit)]
 
 
 def add_direct_address_evidence(evidence, seen, normalized, body, direction):
@@ -340,6 +422,7 @@ def build_people(profiles):
                     "lastSeen": item["lastSeen"],
                     "relationshipGuess": item["relationshipGuess"],
                     "roleEvidenceSummary": role_evidence_summary(item),
+                    "metadataSummary": metadata_summary(item),
                     "typingStyle": item["typingStyle"],
                     "identityConfidence": item["identityConfidence"],
                     "identityEvidence": item["identityEvidence"],
@@ -395,6 +478,7 @@ def write_markdown(path, profiles, days):
             f"- Scores: sentiment {profile['sentimentScore']}, warmth {profile['warmthScore']}, friction {profile['frictionScore']}, operational {profile['operationalScore']}",
             f"- Tags: {', '.join(profile['tags'])}",
             f"- Role evidence: {role_evidence_summary(profile)}",
+            f"- Metadata signals: {metadata_summary(profile)}",
             f"- Typing style: {typing_style_summary(profile['typingStyle'])}",
             "",
         ])
@@ -464,7 +548,8 @@ def write_people_memory(path, people, days):
         for source in person["sourceProfiles"]:
             style = typing_style_summary(source.get("typingStyle", {}))
             evidence = source.get("roleEvidenceSummary") or "no direct role evidence"
-            lines.append(f"  - {source['sourceSystem']} / {source['chatName']}: {source['relationshipGuess']}; role evidence {evidence}; {source['messageCount']} messages; style {style}")
+            metadata = source.get("metadataSummary") or "no source metadata"
+            lines.append(f"  - {source['sourceSystem']} / {source['chatName']}: {source['relationshipGuess']}; role evidence {evidence}; metadata {metadata}; {source['messageCount']} messages; style {style}")
         lines.append("")
     write_text_atomic(path, "\n".join(lines) + "\n")
 
@@ -484,6 +569,23 @@ def role_evidence_summary(profile):
     if not scores:
         return "none detected"
     return ", ".join(f"{role}={score}" for role, score in list(scores.items())[:3])
+
+
+def metadata_summary(profile):
+    signals = profile.get("metadataSignals") or {}
+    parts = []
+    labels = [
+        ("titles", "titles"),
+        ("departments", "departments"),
+        ("companies", "companies"),
+        ("emailDomains", "domains"),
+        ("flags", "flags"),
+    ]
+    for key, label in labels:
+        values = [item.get("value") for item in signals.get(key, []) if item.get("value")]
+        if values:
+            parts.append(f"{label}: {', '.join(values[:3])}")
+    return "; ".join(parts) if parts else "none detected"
 
 
 def write_json_atomic(path, data):

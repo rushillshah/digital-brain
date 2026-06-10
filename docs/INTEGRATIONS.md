@@ -48,6 +48,8 @@ digital-brain interpret
 
 Slack export access depends on workspace permissions and plan. Public-channel exports are common; private channels and DMs may require elevated workspace export permissions.
 
+When Slack exports include user profile metadata, Digital Brain stores title, department, company/team, email domain, and admin/bot flags as source metadata for relationship inference.
+
 Export guide: https://slack.com/help/articles/201658943-Export-your-workspace-data
 
 ### Slack outbound
@@ -72,7 +74,7 @@ digital-brain extract
 digital-brain interpret
 ```
 
-Teams import writes normalized records under `08 Sources/Microsoft Teams/Raw` and month chat notes under `08 Sources/Microsoft Teams/ChatsByMonth`. Use `--privacy-mode metadata-only` to store message metadata without bodies.
+Teams import writes normalized records under `08 Sources/Microsoft Teams/Raw` and month chat notes under `08 Sources/Microsoft Teams/ChatsByMonth`. When exports include Graph user fields, Digital Brain stores job title, department, company, email domain, office location, and channel/team IDs as source metadata for relationship inference. Use `--privacy-mode metadata-only` to store message metadata without bodies.
 
 ### Microsoft Teams outbound
 

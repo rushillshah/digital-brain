@@ -53,7 +53,8 @@ def import_export(vault, source, days):
 
 def slack_record(item, users, chat_name, is_group, conversation_id):
     user_id = item.get("user") or item.get("bot_id") or "unknown"
-    author = users.get(user_id, user_id)
+    user = users.get(user_id, {})
+    author = user.get("displayName") or user_id
     timestamp = datetime.fromtimestamp(float(item["ts"]), tz=timezone.utc).isoformat()
     return {
         "id": f"slack-{conversation_id}-{item['ts']}",
@@ -66,6 +67,21 @@ def slack_record(item, users, chat_name, is_group, conversation_id):
         "fromMe": False,
         "author": author,
         "authorId": user_id,
+        "authorEmail": user.get("email") or "",
+        "authorMetadata": {
+            key: value
+            for key, value in {
+                "title": user.get("title") or "",
+                "department": user.get("department") or "",
+                "company": user.get("company") or "",
+                "email": user.get("email") or "",
+                "teamId": user.get("teamId") or "",
+                "isAdmin": user.get("isAdmin"),
+                "isOwner": user.get("isOwner"),
+                "isBot": user.get("isBot"),
+            }.items()
+            if value not in ("", None)
+        },
         "body": item.get("text") or "",
     }
 
@@ -77,7 +93,17 @@ def load_users(path):
         if not user_id:
             continue
         profile = item.get("profile") or {}
-        users[user_id] = profile.get("real_name") or profile.get("display_name") or item.get("name") or user_id
+        users[user_id] = {
+            "displayName": profile.get("real_name") or profile.get("display_name") or item.get("real_name") or item.get("name") or user_id,
+            "title": profile.get("title") or item.get("title") or "",
+            "department": profile.get("department") or item.get("department") or "",
+            "company": profile.get("team") or profile.get("company") or item.get("team") or "",
+            "email": profile.get("email") or item.get("email") or "",
+            "teamId": item.get("team_id") or item.get("team") or "",
+            "isAdmin": item.get("is_admin"),
+            "isOwner": item.get("is_owner"),
+            "isBot": item.get("is_bot") or item.get("bot_id") is not None,
+        }
     return users
 
 

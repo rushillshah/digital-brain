@@ -197,6 +197,9 @@ Generated draft, not truth. These are private working notes. Edit them where wro
 ## Role Evidence From Conversation
 {render_role_evidence(model)}
 
+## Source Metadata Signals
+{render_metadata_signals(model)}
+
 ## Typing Style To Match
 {render_typing_style(model)}
 
@@ -253,6 +256,7 @@ def write_person_reply_index(path, people, models):
         for model in linked_models:
             lines.extend([
                 f"  - {model['sourceSystem']} / {model['chatName']}: {model['role']} ({model['roleConfidence']}), closeness {model['closeness']}, difficulty {model['conversationDifficulty']}.",
+                f"    Metadata: {metadata_summary(model)}.",
                 f"    Style: {model.get('typingStyle', {}).get('signature', 'unknown')}.",
                 f"    Reply: {' '.join(model.get('replyStyle', [])[:2])}",
             ])
@@ -296,6 +300,37 @@ def render_role_evidence(model):
     for item in evidence[:6]:
         lines.append(f"- {item.get('role')}: {item.get('signal')} ({item.get('direction')}); \"{item.get('snippet')}\"")
     return "\n".join(lines)
+
+
+def render_metadata_signals(model):
+    signals = model.get("metadataSignals") or {}
+    lines = []
+    for key, label in (
+        ("titles", "Titles"),
+        ("departments", "Departments"),
+        ("companies", "Companies"),
+        ("emailDomains", "Email domains"),
+        ("flags", "Flags"),
+    ):
+        values = [item.get("value") for item in signals.get(key, []) if item.get("value")]
+        if values:
+            lines.append(f"- {label}: {', '.join(values[:5])}")
+    return "\n".join(lines) if lines else "- No source metadata detected."
+
+
+def metadata_summary(model):
+    signals = model.get("metadataSignals") or {}
+    parts = []
+    for key, label in (
+        ("titles", "titles"),
+        ("departments", "departments"),
+        ("companies", "companies"),
+        ("emailDomains", "domains"),
+    ):
+        values = [item.get("value") for item in signals.get(key, []) if item.get("value")]
+        if values:
+            parts.append(f"{label}: {', '.join(values[:3])}")
+    return "; ".join(parts) if parts else "none detected"
 
 
 def render_typing_style(model):

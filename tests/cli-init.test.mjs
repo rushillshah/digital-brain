@@ -592,7 +592,7 @@ test("slack teams and linkedin imports feed relationship memory", () => {
   fs.mkdirSync(path.join(slack, "D1"), { recursive: true });
   fs.writeFileSync(path.join(slack, "users.json"), JSON.stringify([
     { id: "U1", name: "teammate", profile: { real_name: "Team Mate" } },
-    { id: "U2", name: "ada", profile: { real_name: "Ada Lovelace" } },
+    { id: "U2", name: "ada", profile: { real_name: "Ada Lovelace", title: "Founder", email: "ada@analytical.example" } },
   ]));
   fs.writeFileSync(path.join(slack, "channels.json"), JSON.stringify([{ id: "C1", name: "general" }]));
   fs.writeFileSync(path.join(slack, "dms.json"), JSON.stringify([{ id: "D1" }]));
@@ -610,7 +610,7 @@ test("slack teams and linkedin imports feed relationship memory", () => {
         createdDateTime: "2026-01-01T00:00:02Z",
         chatId: "19:teams-chat",
         chatDisplayName: "Ada Lovelace",
-        from: { user: { id: "aad-1", displayName: "Ada Lovelace", userPrincipalName: "ada@example.com" } },
+        from: { user: { id: "aad-1", displayName: "Ada Lovelace", userPrincipalName: "ada@example.com", jobTitle: "Principal Engineer", department: "Engineering" } },
         body: { contentType: "html", content: "<p>Teams note: can you check the launch dashboard?</p>" },
       },
     ],
@@ -636,6 +636,12 @@ test("slack teams and linkedin imports feed relationship memory", () => {
   assert.ok(profiles.some((profile) => profile.sourceSystem === "Slack"));
   assert.ok(profiles.some((profile) => profile.sourceSystem === "Microsoft Teams"));
   assert.ok(profiles.some((profile) => profile.sourceSystem === "LinkedIn"));
+  const slackAda = profiles.find((profile) => profile.sourceSystem === "Slack" && profile.chatName === "D1");
+  assert.match(slackAda.metadataSignals.titles[0].value, /Founder/);
+  const teamsAda = profiles.find((profile) => profile.sourceSystem === "Microsoft Teams");
+  assert.match(teamsAda.metadataSignals.titles[0].value, /Principal Engineer/);
+  assert.match(teamsAda.metadataSignals.departments[0].value, /Engineering/);
+  assert.ok(teamsAda.roleEvidence.some((item) => item.signal === "profile metadata role/title"));
   const people = readJson(path.join(vault, "08 Sources", "Analysis", "person_identity_map.json"));
   const ada = people.find((person) => person.displayName === "Ada Lovelace");
   assert.deepEqual(ada.sources.sort(), ["LinkedIn", "Microsoft Teams", "Slack"]);
@@ -643,7 +649,9 @@ test("slack teams and linkedin imports feed relationship memory", () => {
   assert.match(read(path.join(vault, "06 AI Memory", "Person Context Index.md")), /Ada Lovelace/);
   const replyContext = read(path.join(vault, "06 AI Memory", "Person Reply Context.md"));
   assert.match(replyContext, /Slack \/ D1/);
+  assert.match(replyContext, /Metadata: titles: Founder/);
   assert.match(replyContext, /Microsoft Teams \/ Ada Lovelace/);
+  assert.match(replyContext, /Principal Engineer/);
   assert.match(replyContext, /LinkedIn \/ Ada Lovelace/);
   assert.match(read(path.join(vault, "04 People", "LinkedIn Connections.md")), /Ada Lovelace/);
 });

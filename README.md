@@ -116,6 +116,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Import Gmail Takeout `.mbox` exports into email context.
 - Import Google Calendar `.ics` exports into schedule/life context.
 - Build relationship profiles from message patterns.
+- Use source metadata from Slack and Microsoft Teams, like title, department, company, email domain, and admin/bot flags when exports include it.
 - Merge confirmed-looking same-person profiles across sources into a person context index.
 - Infer provisional roles like parent, sibling, family group, work collaborator, close personal contact, or unlabeled contact using contact names, message patterns, and explicit conversation evidence.
 - Extract relationship-specific typing style: casing, message length, punctuation, emoji, and slang.
