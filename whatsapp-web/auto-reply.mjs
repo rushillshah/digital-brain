@@ -52,6 +52,9 @@ const processUnreadOnStart = !Boolean(args["no-process-unread"]);
 const cooldownMinutes = numberArg("cooldown-minutes", 20);
 const maxRepliesPerChat = numberArg("max-replies-per-chat", 0);
 const maxContextChars = numberArg("max-context-chars", 12000);
+const maxSharedGroupContextChars = numberArg("max-shared-group-context-chars", 3000);
+const sharedGroupContextDays = numberArg("shared-group-context-days", 14);
+const sharedGroupContextEnabled = !Boolean(args["no-shared-group-context"]);
 const replyDebounceMs = numberArg("reply-debounce-ms", 12000);
 const outboundLogMode = args["log-mode"] || config.outboundLogMode || "metadata";
 const state = loadState();
@@ -336,6 +339,7 @@ async function handleMessage(message, knownChat = null) {
 
 function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequired }) {
   const memory = readMemoryContext(chatName);
+  const sharedGroupContext = readSharedGroupContext(chatName);
   const unansweredInbound = latestUnansweredInbound(recentMessages, incomingBody);
   const selfRecentMessages = recentMessages.filter((item) => item.fromMe && compact(item.body || "")).map((item) => item.body || "");
   const language = languageProfile(selfRecentMessages);
@@ -359,6 +363,8 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "If the other person sent multiple messages in a row, answer the combined latest intent once.",
     "If there is no concrete reply needed, output exactly NO_REPLY.",
     "Do not bring in memory context unless it directly helps answer the latest unanswered chunk.",
+    "Use shared group context only when it explains the latest direct message or prevents losing intent from a related group thread.",
+    "Do not mention group context unless the user would naturally know it. Do not leak unrelated group details into a direct chat.",
     "Do not repeat facts, plans, suggestions, or context that were already stated in the recent chat unless confirming them briefly.",
     "If the chat includes a URL, do not pretend you opened or inspected it. React only to what the sender said, or ask if the user should check it.",
     "Do not start with hey/hi unless the recent chat itself uses that greeting pattern.",
@@ -381,6 +387,9 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "",
     "Relevant local memory:",
     memory,
+    "",
+    "Shared group context involving this person:",
+    sharedGroupContext,
     "",
     "Recent chat:",
     transcript,
@@ -487,6 +496,83 @@ function readMemoryContext(chatName) {
   }
   const focused = matchingWindow.join("\n\n") || text;
   return focused.slice(0, maxContextChars);
+}
+
+function readSharedGroupContext(chatNameValue) {
+  if (!sharedGroupContextEnabled || maxSharedGroupContextChars <= 0) return "Disabled.";
+  const rawDir = path.join(whatsAppDir, "Raw");
+  if (!fs.existsSync(rawDir)) return "No WhatsApp raw source data found.";
+  const target = nameFingerprint(chatNameValue);
+  if (!target.normalized) return "No matching person name available.";
+  const cutoff = Date.now() - sharedGroupContextDays * 24 * 60 * 60 * 1000;
+  const byGroup = new Map();
+  for (const file of fs.readdirSync(rawDir).filter((name) => name.endsWith(".jsonl")).sort().reverse()) {
+    const fullPath = path.join(rawDir, file);
+    const lines = fs.readFileSync(fullPath, "utf8").split("\n").filter(Boolean);
+    for (const line of lines) {
+      const record = parseJsonLine(line);
+      if (!record?.isGroup || !record.chatName || !record.timestamp) continue;
+      const timestamp = new Date(record.timestamp).getTime();
+      if (Number.isFinite(timestamp) && timestamp < cutoff) continue;
+      const body = compact(record.body || "");
+      if (!body) continue;
+      const group = byGroup.get(record.chatName) || [];
+      group.push({
+        timestamp: record.timestamp,
+        author: record.fromMe ? "Me" : compact(record.author || "Unknown"),
+        fromMe: Boolean(record.fromMe),
+        body,
+        isTarget: !record.fromMe && personNameMatches(record.author || "", target),
+      });
+      byGroup.set(record.chatName, group);
+    }
+  }
+  const sections = [];
+  for (const [groupName, records] of byGroup.entries()) {
+    const sorted = records.sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
+    const targetIndexes = sorted.map((record, index) => record.isTarget ? index : -1).filter((index) => index >= 0);
+    if (!targetIndexes.length) continue;
+    const selected = new Map();
+    for (const index of targetIndexes.slice(-4)) {
+      for (let i = Math.max(0, index - 2); i <= Math.min(sorted.length - 1, index + 2); i += 1) {
+        selected.set(i, sorted[i]);
+      }
+    }
+    const lines = [...selected.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, record]) => `- ${record.author}: ${record.body}`);
+    if (lines.length) {
+      sections.push(`## ${groupName}\n${lines.join("\n")}`);
+    }
+  }
+  if (!sections.length) return "No recent shared group context found for this person.";
+  return sections.join("\n\n").slice(0, maxSharedGroupContextChars);
+}
+
+function personNameMatches(value, target) {
+  const candidate = nameFingerprint(value);
+  if (!candidate.normalized) return false;
+  if (candidate.normalized === target.normalized) return true;
+  if (candidate.normalized.includes(target.normalized) || target.normalized.includes(candidate.normalized)) {
+    return Math.min(candidate.normalized.length, target.normalized.length) >= 4;
+  }
+  if (target.tokens.length >= 2 && candidate.tokens.length >= 2) {
+    const overlap = target.tokens.filter((token) => candidate.tokens.includes(token));
+    return overlap.length >= 2;
+  }
+  return false;
+}
+
+function nameFingerprint(value) {
+  const normalized = String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const tokens = normalized
+    .split(" ")
+    .filter((token) => token.length >= 3 && !["the", "and", "group", "chat"].includes(token));
+  return { normalized, tokens };
 }
 
 async function generateReply(prompt) {
@@ -1246,6 +1332,7 @@ function parseArgs(argv) {
     else if (arg === "--include-groups") out["include-groups"] = true;
     else if (arg === "--include-businesses") out["include-businesses"] = true;
     else if (arg === "--no-process-unread") out["no-process-unread"] = true;
+    else if (arg === "--no-shared-group-context") out["no-shared-group-context"] = true;
     else if (arg.startsWith("--")) {
       const key = arg.slice(2);
       out[key] = argv[++i] || "";

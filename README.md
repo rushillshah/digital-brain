@@ -137,6 +137,7 @@ digital-brain send-slack --channel C123 --message "text"
 digital-brain send-imessage --to "+15551234567" --message "text"
 digital-brain auto-whatsapp --allow "Name" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
+digital-brain auto-whatsapp --allow "Name" --shared-group-context-days 14
 OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini --yes
 ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow-all --provider anthropic --yes
 XAI_API_KEY="xai-..." digital-brain auto-whatsapp --allow-all --provider xai --yes
@@ -178,6 +179,7 @@ digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes --no-process-unread
 digital-brain auto-whatsapp --allow "Mom" --reply-style-mode casual-imperfect --yes
+digital-brain auto-whatsapp --allow "Mom" --shared-group-context-days 14 --yes
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1 --yes
 OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini --yes
 ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow-all --provider anthropic --yes
@@ -189,6 +191,8 @@ digital-brain auto-whatsapp --allow-all --provider codex-app --yes
 If you start without `--allow`, `--contact`, or `--allow-all` in an interactive terminal, Digital Brain asks whether to cover all contacts or select contacts from your WhatsApp chat list. With `--allow-all`, it still asks once before the first AI reply to each new chat and stores the decision in `08 Sources/WhatsApp/Outbound/auto-reply-whitelist.json`. Use `--auto-approve-new-chats` only if you intentionally want unattended first sends.
 
 Even with `--allow-all`, likely business, notification, OTP, delivery, bank, and support chats are skipped by default. Use explicit `--allow "Name"` or `--contact "+15551234567"` for trusted personal chats. Pass `--include-businesses` only if you intentionally want those chats included.
+
+Auto-reply also includes bounded shared group context by default. When replying to a direct chat, it scans recent WhatsApp raw records for group chats where that person appears as a participant and adds short nearby snippets to the prompt. This helps preserve intent when a direct message continues something discussed in a group. Tune it with `--shared-group-context-days 14`, `--max-shared-group-context-chars 3000`, or disable it with `--no-shared-group-context`.
 
 The default provider is local Ollama. `--provider openai`, `--provider anthropic`, and `--provider xai` use hosted APIs with the same vault context prompt. Defaults are `gpt-4.1-mini`, `claude-sonnet-4-6`, and `grok-4.3`. `--provider codex` uses the Codex CLI. `--provider codex-app` uses a file bridge for the Codex desktop app.
 

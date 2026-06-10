@@ -509,6 +509,12 @@ test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", ()
   assert.match(source, /readSelfPunctuationStyle/);
   assert.match(source, /prefersPunctuation/);
   assert.match(source, /Do not repeat facts, plans, suggestions, or context/);
+  assert.match(source, /Shared group context involving this person/);
+  assert.match(source, /readSharedGroupContext/);
+  assert.match(source, /Use shared group context only when it explains the latest direct message/);
+  assert.match(source, /no-shared-group-context/);
+  assert.match(source, /shared-group-context-days", 14/);
+  assert.match(source, /max-shared-group-context-chars", 3000/);
   assert.match(source, /Avoid assistant-like niceness and filler/);
   assert.match(source, /btw ai is helping me reply rn/);
   assert.match(source, /max_output_tokens: 80/);
