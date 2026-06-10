@@ -275,6 +275,58 @@ test("sample extractor and interpreter produce relationship memory", () => {
   assert.match(interpreted, /Generated draft/);
 });
 
+test("interpreter infers roles from conversation evidence, not just contact names", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const raw = path.join(vault, "08 Sources", "WhatsApp", "Raw");
+  fs.mkdirSync(raw, { recursive: true });
+  fs.writeFileSync(path.join(raw, "2026-06-09.jsonl"), [
+    {
+      id: "sibling-1",
+      sourceSystem: "WhatsApp",
+      timestamp: "2026-06-09T10:00:00+00:00",
+      chatName: "Avery",
+      isGroup: false,
+      fromMe: false,
+      author: "Avery",
+      body: "are you coming home for dinner?",
+    },
+    {
+      id: "sibling-2",
+      sourceSystem: "WhatsApp",
+      timestamp: "2026-06-09T10:01:00+00:00",
+      chatName: "Avery",
+      isGroup: false,
+      fromMe: true,
+      author: "Me",
+      body: "you're my younger sister obviously i'll ask mom",
+    },
+    {
+      id: "sibling-3",
+      sourceSystem: "WhatsApp",
+      timestamp: "2026-06-09T10:02:00+00:00",
+      chatName: "Avery",
+      isGroup: false,
+      fromMe: false,
+      author: "Avery",
+      body: "ok tell me when she says yes",
+    },
+  ].map((record) => JSON.stringify(record)).join("\n"));
+
+  run([cli, "extract", "--vault", vault, "--days", "30", "--min-messages", "1"]);
+  run([cli, "interpret", "--vault", vault, "--days", "30"]);
+
+  const profiles = readJson(path.join(vault, "08 Sources", "Analysis", "relationship_profiles.json"));
+  const profile = profiles.find((item) => item.chatName === "Avery");
+  assert.equal(profile.roleEvidenceScores.sibling, 5);
+  assert.ok(profile.roleEvidence.some((item) => item.signal === "explicit second-person kinship"));
+
+  const interpreted = read(path.join(vault, "06 AI Memory", "Generated Relationship Drafts", "Avery (WhatsApp).md"));
+  assert.match(interpreted, /Role: sibling/);
+  assert.match(interpreted, /conversation evidence/);
+  assert.match(interpreted, /Role Evidence From Conversation/);
+});
+
 test("extract writes self communication style from outbound messages", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");

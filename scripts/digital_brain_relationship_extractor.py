@@ -14,6 +14,18 @@ LOGISTICS = {"when", "where", "time", "today", "tomorrow", "meeting", "call", "s
 WORK = {"pr", "repo", "client", "customer", "meeting", "deck", "code", "ship", "product", "founder", "startup", "work", "office", "investor", "sales", "demo", "launch"}
 SLANG = {"lol", "lmao", "haha", "hahaha", "bro", "bruh", "wtf", "omg", "ngl", "idk", "rn", "btw", "bc", "pls", "plz", "ya", "yeah", "yep", "nah", "fuck", "shit"}
 DISCOURSE_MARKERS = {"actually", "basically", "bro", "cool", "like", "literally", "no", "okay", "so", "wait", "yeah"}
+ROLE_TERMS = {
+    "mother": {"mom", "mum", "mummy", "maa", "mother"},
+    "father": {"dad", "papa", "father"},
+    "sibling": {"sister", "brother", "sis", "didi", "behen"},
+    "family": {"cousin", "uncle", "aunt", "aunty", "family"},
+    "romantic partner": {"babe", "baby", "jaan"},
+}
+POSSESSIVE_ROLE_RE = re.compile(r"\b(my|your|his|her|their|our|the)\s+(mom|mum|mummy|maa|mother|dad|papa|father|sister|brother|cousin|uncle|aunt|aunty)\b")
+SECOND_PERSON_KINSHIP_RE = re.compile(r"\b(you are|you're|u are|ur|as my|my|as your|your)\s+(older|younger|little|big)?\s*(sister|brother|sis)\b")
+WORK_SIGNAL_RE = re.compile(r"\b(pr|pull request|merge|deploy|deployment|github|repo|frontend|backend|client|customer|intern|manager|founder|investor|meeting|standup|sprint|ticket|issue|bug|production|staging|dev)\b")
+ROMANTIC_SIGNAL_RE = re.compile(r"\b(babe|baby|my love|love you|ily|miss you|girlfriend|boyfriend)\b")
+FAMILY_CONTEXT_RE = re.compile(r"\b(home|parents|family|mom|mum|mummy|maa|dad|papa|father|mother|cousin|uncle|aunt|aunty)\b")
 STOPWORDS = {
     "a", "about", "all", "am", "an", "and", "are", "as", "at", "be", "been", "but", "by", "can", "could", "did", "do", "does",
     "for", "from", "get", "got", "had", "has", "have", "he", "her", "here", "him", "his", "how", "i", "if", "in", "is", "it",
@@ -85,6 +97,8 @@ def profile_chat(chat_key, messages):
     dates = [m["_dt"] for m in messages]
     text = "\n".join(m.get("body") or "" for m in messages)
     outbound_messages = [m for m in messages if m.get("fromMe") and (m.get("body") or "").strip()]
+    role_evidence = extract_role_evidence(messages)
+    role_scores = role_evidence_scores(role_evidence)
     words = Counter(re.findall(r"[a-zA-Z']+", text.lower()))
     positive = score(words, POSITIVE)
     negative = score(words, NEGATIVE)
@@ -118,6 +132,8 @@ def profile_chat(chat_key, messages):
         "operationalScore": round(operational, 3),
         "questionCount": text.count("?"),
         "relationshipGuess": guess,
+        "roleEvidence": role_evidence,
+        "roleEvidenceScores": role_scores,
         "tags": tags,
         "typingStyle": typing_style(outbound_messages),
     }
@@ -159,6 +175,86 @@ def infer_relationship(tags, count, warmth, friction, operational, work, balance
     if balance < 0.25 or balance > 0.75:
         return "asymmetric communication pattern"
     return "general relationship, needs human labeling"
+
+
+def extract_role_evidence(messages):
+    evidence = []
+    seen = set()
+    for message in messages:
+        body = (message.get("body") or "").strip()
+        if not body:
+            continue
+        normalized = normalize_message(body)
+        if not normalized:
+            continue
+        direction = "outbound" if message.get("fromMe") else "inbound"
+        add_direct_address_evidence(evidence, seen, normalized, body, direction)
+        add_context_evidence(evidence, seen, normalized, body, direction)
+        if len(evidence) >= 24:
+            break
+    return evidence[:12]
+
+
+def add_direct_address_evidence(evidence, seen, normalized, body, direction):
+    if SECOND_PERSON_KINSHIP_RE.search(normalized):
+        add_role_evidence(evidence, seen, "sibling", "explicit second-person kinship", 5, body, direction)
+        return
+    if POSSESSIVE_ROLE_RE.search(normalized):
+        return
+    for role, terms in ROLE_TERMS.items():
+        for term in sorted(terms, key=len, reverse=True):
+            if re.search(rf"\b{re.escape(term)}\b", normalized):
+                weight = 4 if role in {"mother", "father", "sibling"} else 3
+                signal = "direct kinship/address term" if role != "romantic partner" else "romantic address term"
+                add_role_evidence(evidence, seen, role, signal, weight, body, direction)
+                return
+
+
+def add_context_evidence(evidence, seen, normalized, body, direction):
+    work_hits = WORK_SIGNAL_RE.findall(normalized)
+    if len(set(work_hits)) >= 2:
+        add_role_evidence(evidence, seen, "work collaborator", "work/project conversation signals", 2, body, direction)
+    elif len(set(work_hits)) == 1:
+        add_role_evidence(evidence, seen, "work collaborator", "work/project term", 1, body, direction)
+    if ROMANTIC_SIGNAL_RE.search(normalized) and not re.search(r"\b(do not|don't|dont)\s+(love|miss)\b", normalized):
+        add_role_evidence(evidence, seen, "romantic partner", "romantic phrase", 3, body, direction)
+    if FAMILY_CONTEXT_RE.search(normalized) and re.search(r"\b(come|coming|home|parents|family|dinner|hospital|doctor)\b", normalized):
+        add_role_evidence(evidence, seen, "family", "family/logistics context", 1, body, direction)
+
+
+def add_role_evidence(evidence, seen, role, signal, weight, body, direction):
+    snippet = clean_snippet(body)
+    key = (role, signal, direction, snippet.lower())
+    if key in seen:
+        return
+    seen.add(key)
+    evidence.append({
+        "role": role,
+        "signal": signal,
+        "weight": weight,
+        "direction": direction,
+        "snippet": snippet,
+    })
+
+
+def role_evidence_scores(evidence):
+    scores = Counter()
+    for item in evidence:
+        scores[item["role"]] += item.get("weight", 1)
+    return dict(scores.most_common())
+
+
+def clean_snippet(value):
+    text = " ".join(str(value or "").split())
+    text = re.sub(r"https?://\S+", "[link]", text)
+    return text[:180]
+
+
+def normalize_message(value):
+    text = str(value or "").lower()
+    text = re.sub(r"https?://\S+", " ", text)
+    text = re.sub(r"[^a-z0-9'+]+", " ", text)
+    return " ".join(text.split())
 
 
 def infer_identity(source, chat_name, messages):
@@ -243,6 +339,7 @@ def build_people(profiles):
                     "firstSeen": item["firstSeen"],
                     "lastSeen": item["lastSeen"],
                     "relationshipGuess": item["relationshipGuess"],
+                    "roleEvidenceSummary": role_evidence_summary(item),
                     "typingStyle": item["typingStyle"],
                     "identityConfidence": item["identityConfidence"],
                     "identityEvidence": item["identityEvidence"],
@@ -297,6 +394,7 @@ def write_markdown(path, profiles, days):
             f"- Dates: {profile['firstSeen']} to {profile['lastSeen']}",
             f"- Scores: sentiment {profile['sentimentScore']}, warmth {profile['warmthScore']}, friction {profile['frictionScore']}, operational {profile['operationalScore']}",
             f"- Tags: {', '.join(profile['tags'])}",
+            f"- Role evidence: {role_evidence_summary(profile)}",
             f"- Typing style: {typing_style_summary(profile['typingStyle'])}",
             "",
         ])
@@ -365,7 +463,8 @@ def write_people_memory(path, people, days):
         ])
         for source in person["sourceProfiles"]:
             style = typing_style_summary(source.get("typingStyle", {}))
-            lines.append(f"  - {source['sourceSystem']} / {source['chatName']}: {source['relationshipGuess']}; {source['messageCount']} messages; style {style}")
+            evidence = source.get("roleEvidenceSummary") or "no direct role evidence"
+            lines.append(f"  - {source['sourceSystem']} / {source['chatName']}: {source['relationshipGuess']}; role evidence {evidence}; {source['messageCount']} messages; style {style}")
         lines.append("")
     write_text_atomic(path, "\n".join(lines) + "\n")
 
@@ -378,6 +477,13 @@ def write_legacy_whatsapp_outputs(vault, output_dir):
         target = legacy_dir / name
         if source.exists():
             write_text_atomic(target, source.read_text(encoding="utf-8"))
+
+
+def role_evidence_summary(profile):
+    scores = profile.get("roleEvidenceScores") or {}
+    if not scores:
+        return "none detected"
+    return ", ".join(f"{role}={score}" for role, score in list(scores.items())[:3])
 
 
 def write_json_atomic(path, data):

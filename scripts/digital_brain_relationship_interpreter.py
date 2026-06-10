@@ -57,11 +57,13 @@ def main():
 
 def build_model(profile, override):
     role, confidence, reason = infer_role(profile, override)
+    override_notes = str(override.get("notes", "")).strip()
     return {
         **profile,
         "role": role,
         "roleConfidence": confidence,
         "roleReason": reason,
+        "overrideNotes": override_notes,
         "closeness": infer_closeness(profile),
         "conversationDifficulty": infer_difficulty(profile),
         "reciprocity": infer_reciprocity(profile),
@@ -74,6 +76,9 @@ def build_model(profile, override):
 def infer_role(profile, override):
     if override.get("role"):
         return override["role"], override.get("confidence", "high"), "manual override"
+    evidence_role = infer_role_from_conversation(profile)
+    if evidence_role:
+        return evidence_role
     name = profile["chatName"].lower()
     for role, keywords in ROLE_KEYWORDS:
         if any(keyword in name for keyword in keywords):
@@ -87,6 +92,26 @@ def infer_role(profile, override):
     if "logistics-heavy" in profile["tags"]:
         return "operational contact", "low", "logistics-heavy communication"
     return "unlabeled contact", "low", "no reliable role evidence"
+
+
+def infer_role_from_conversation(profile):
+    scores = profile.get("roleEvidenceScores") or {}
+    evidence = profile.get("roleEvidence") or []
+    if not scores:
+        return None
+    ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    role, score = ranked[0]
+    second_score = ranked[1][1] if len(ranked) > 1 else 0
+    if score < 3:
+        return None
+    if score < 5 and score - second_score < 2:
+        return None
+    confidence = "high" if score >= 7 and score - second_score >= 3 else "medium"
+    snippets = [item.get("snippet") for item in evidence if item.get("role") == role and item.get("snippet")]
+    reason = f"conversation evidence: {score} score"
+    if snippets:
+        reason += f"; e.g. {snippets[0]}"
+    return role, confidence, reason
 
 
 def infer_closeness(profile):
@@ -158,6 +183,7 @@ Generated draft, not truth. These are private working notes. Edit them where wro
 ## Role / Relationship Label
 - {model['role']} ({model['roleConfidence']} confidence).
 - Reason: {model['roleReason']}.
+{manual_note(model)}
 
 ## Closeness And Importance
 - Closeness: {model['closeness']}.
@@ -167,6 +193,9 @@ Generated draft, not truth. These are private working notes. Edit them where wro
 ## Communication Pattern
 - Messages: {model['messageCount']} ({model['inbound']} inbound, {model['outbound']} outbound).
 - Tags: {', '.join(model['tags'])}.
+
+## Role Evidence From Conversation
+{render_role_evidence(model)}
 
 ## Typing Style To Match
 {render_typing_style(model)}
@@ -227,6 +256,8 @@ def write_person_reply_index(path, people, models):
                 f"    Style: {model.get('typingStyle', {}).get('signature', 'unknown')}.",
                 f"    Reply: {' '.join(model.get('replyStyle', [])[:2])}",
             ])
+            if model.get("overrideNotes"):
+                lines.append(f"    User note: {model['overrideNotes']}")
         lines.append("")
     write_text_atomic(path, "\n".join(lines) + "\n")
 
@@ -247,6 +278,24 @@ def synthesize_people(models_by_key):
 
 def bullets(items):
     return "\n".join(f"- {item}" for item in items)
+
+
+def manual_note(model):
+    note = model.get("overrideNotes", "")
+    if not note:
+        return ""
+    suffix = "" if note[-1] in ".!?" else "."
+    return f"- User note: {note}{suffix}"
+
+
+def render_role_evidence(model):
+    evidence = model.get("roleEvidence") or []
+    if not evidence:
+        return "- No direct role evidence detected in message text."
+    lines = []
+    for item in evidence[:6]:
+        lines.append(f"- {item.get('role')}: {item.get('signal')} ({item.get('direction')}); \"{item.get('snippet')}\"")
+    return "\n".join(lines)
 
 
 def render_typing_style(model):

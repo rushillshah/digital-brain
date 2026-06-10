@@ -76,7 +76,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Import LinkedIn data archives for connections and messages when available.
 - Build relationship profiles from message patterns.
 - Merge confirmed-looking same-person profiles across sources into a person context index.
-- Infer provisional roles like parent, family group, work collaborator, close personal contact, or unlabeled contact.
+- Infer provisional roles like parent, sibling, family group, work collaborator, close personal contact, or unlabeled contact using contact names, message patterns, and explicit conversation evidence.
 - Extract relationship-specific typing style: casing, message length, punctuation, emoji, and slang.
 - Extract your own outbound communication style so drafts can match your casing, slang, punctuation, lexical patterns, and common phrase shapes.
 - Generate "how to continue this relationship" notes.
@@ -222,6 +222,10 @@ npm run test:sample
 
 This uses fake WhatsApp-style messages in `examples/sample-vault`.
 
+## Contributing
+
+PRs are welcome, but this project is privacy-sensitive. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR, especially if touching imports, generated memory, provider prompts, logs, or outbound messaging.
+
 ## Privacy
 
 Digital Brain is local-first. It does not upload messages or notes.
@@ -233,6 +237,7 @@ Apple iMessage support reads the local macOS Messages `chat.db` when available. 
 Slack support reads Slack workspace export JSON. LinkedIn support reads LinkedIn data archive CSV files when LinkedIn includes the relevant files in your archive.
 
 Relationship labels are working notes, not truth. You can edit them with `relationship_overrides.json`.
+Role inference records evidence snippets from conversation text when available, but labels are still provisional and should be corrected with overrides where wrong.
 
 Always-on and outbound modes depend on local app databases, WhatsApp Web, and third-party behavior that can change. You are responsible for consent, privacy, message content, and anything sent from your machine.
 
