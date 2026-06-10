@@ -74,6 +74,7 @@ client.on("ready", async () => {
 
 client.on("message", async (message) => {
   try {
+    console.log(`Received WhatsApp message event: ${summarize(message.body || "[non-text message]")}`);
     await handleMessage(message);
   } catch (error) {
     console.error(`Auto-reply error: ${error.message}`);
@@ -121,12 +122,29 @@ async function handleMessage(message, knownChat = null) {
 
   const chat = knownChat || await message.getChat();
   const name = chatName(chat);
-  if (chat.isGroup && !includeGroups) return;
-  if (!isAllowed(name)) return;
-  if (isDenied(name)) return;
-  if (isCoolingDown(name)) return;
-  if (replyCount(name) >= maxRepliesPerChat) return;
+  console.log(`Received from ${name}: ${summarize(message.body || "[non-text message]")}`);
+  if (chat.isGroup && !includeGroups) {
+    console.log(`Skipping group chat: ${name}`);
+    return;
+  }
+  if (!isAllowed(name)) {
+    console.log(`Skipping chat outside allowlist: ${name}`);
+    return;
+  }
+  if (isDenied(name)) {
+    console.log(`Skipping denied chat: ${name}`);
+    return;
+  }
+  if (isCoolingDown(name)) {
+    console.log(`Skipping chat during cooldown: ${name}`);
+    return;
+  }
+  if (replyCount(name) >= maxRepliesPerChat) {
+    console.log(`Skipping chat at reply cap: ${name}`);
+    return;
+  }
 
+  console.log(`Fetching context for ${name}...`);
   const recentMessages = await chat.fetchMessages({ limit: 12 });
   if (shouldSkipNonPersonalChat(name, recentMessages)) {
     console.log(`Skipping likely business/notification chat: ${name}`);
@@ -140,7 +158,10 @@ async function handleMessage(message, knownChat = null) {
     recentMessages,
     disclosureRequired: disclosure.required,
   });
+  console.log(`Generating reply for ${name} with ${model}...`);
+  const startedAt = Date.now();
   const reply = await generateReply(prompt);
+  console.log(`Generated reply for ${name} in ${Date.now() - startedAt}ms: ${summarize(reply || "[empty reply]")}`);
   const finalReply = disclosure.required && !containsDisclosure(reply)
     ? `Just flagging this is my AI assistant helping draft/send this. ${reply}`
     : reply;
