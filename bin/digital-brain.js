@@ -32,7 +32,7 @@ async function main() {
   else if (command === "run" || command === "refresh") await runRefresh(argv, args);
   else if (command === "doctor") doctor();
   else if (command === "tutorial" || command === "setup-check") doctor({ tutorial: true });
-  else if (command === "demo-proof") demoProof(argv, args);
+  else if (command === "demo-proof" || command === "showcase") demoProof(argv, args);
   else if (command === "sync-whatsapp") runPython("digital_brain_whatsapp_mac_sync.py", argv);
   else if (command === "sync-imessage") runPython("digital_brain_imessage_sync.py", argv);
   else if (command === "import-slack") runPython("digital_brain_slack_export_import.py", argv);
@@ -1094,6 +1094,7 @@ Usage:
   digital-brain init [vault]
   digital-brain run
   digital-brain demo-proof --out ./demo-assets
+  digital-brain showcase --out ./demo-assets
   digital-brain doctor
   digital-brain tutorial
   digital-brain sync-whatsapp --days 30

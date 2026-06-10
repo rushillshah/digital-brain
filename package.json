@@ -17,6 +17,10 @@
     "examples",
     "docs",
     "README.md",
+    "SECURITY.md",
+    "PRIVACY.md",
+    "ROADMAP.md",
+    "CONTRIBUTING.md",
     "LICENSE"
   ],
   "scripts": {

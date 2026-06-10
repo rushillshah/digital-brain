@@ -1,10 +1,15 @@
 # Digital Brain
 
-Your private digital imprint for AI.
+[![npm version](https://img.shields.io/npm/v/digital-brain.svg)](https://www.npmjs.com/package/digital-brain)
+[![CI](https://github.com/rushillshah/digital-brain/actions/workflows/ci.yml/badge.svg)](https://github.com/rushillshah/digital-brain/actions/workflows/ci.yml)
+[![GitHub stars](https://img.shields.io/github/stars/rushillshah/digital-brain?style=social)](https://github.com/rushillshah/digital-brain/stargazers)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Your life, work, and relationships as a local Obsidian graph that AI can actually use.
 
 Digital Brain turns your local notes and message history into an editable memory vault that AI assistants can use to understand your people, patterns, tone, and context.
 
-It is not a chatbot. It is not a cloud memory service. It is the local context layer that makes your existing AI tools feel less generic.
+It is not a chatbot. It is not a cloud memory service. By default, it writes local files and does not upload your messages.
 
 ![Digital Brain Obsidian demo](docs/assets/digital-brain-demo.gif)
 
@@ -118,6 +123,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 digital-brain init
 digital-brain run
 digital-brain demo-proof --out ./demo-assets
+digital-brain showcase --out ./demo-assets
 digital-brain doctor
 digital-brain sync-imessage --days 30
 digital-brain import-slack --input ./slack-export.zip
@@ -152,7 +158,7 @@ You can add repository context later with `digital-brain connect-repos`; it upda
 
 Use `digital-brain doctor` or `digital-brain tutorial` anytime to see dependency status and next steps.
 
-Use `digital-brain demo-proof --out ./demo-assets` to generate a fake-data sample vault and launch copy for README/social posts. See [docs/GROWTH.md](docs/GROWTH.md).
+Use `digital-brain showcase --out ./demo-assets` to generate a fake-data sample vault and launch copy for README/social posts. See [docs/GROWTH.md](docs/GROWTH.md) and [docs/LAUNCH_KIT.md](docs/LAUNCH_KIT.md).
 
 The lower-level commands still exist for debugging:
 
@@ -244,10 +250,22 @@ After Digital Brain:
 
 Your AI can use local context: this person is your mother, the tone should be warm, the thread may be logistical, and the reply should not sound like a work update.
 
+More examples are in [docs/EXAMPLES.md](docs/EXAMPLES.md).
+
+## Known Limitations
+
+- This is alpha software and source integrations can break when local app schemas or web sessions change.
+- Relationship roles and same-person matches are provisional working notes, not truth.
+- WhatsApp and iMessage local database access is macOS-specific and permission-sensitive.
+- Slack, LinkedIn, Gmail, and Calendar are import/export based unless otherwise documented.
+- Outbound messaging is powerful and risky; keep allowlists narrow and test draft mode first.
+- Hosted AI providers send prompt context to that provider when selected. Local-first does not mean every optional provider is local.
+
 ## Try Fake Data
 
 ```bash
 npm run test:sample
+digital-brain showcase --out ./demo-assets
 ```
 
 This uses fake WhatsApp-style messages in `examples/sample-vault`.
@@ -256,7 +274,7 @@ This uses fake WhatsApp-style messages in `examples/sample-vault`.
 
 PRs are welcome, but this project is privacy-sensitive. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR, especially if touching imports, generated memory, provider prompts, logs, or outbound messaging.
 
-Growth and contributor tooling is documented in [docs/GROWTH.md](docs/GROWTH.md). Do not fake npm downloads, stars, or installs.
+Growth and contributor tooling is documented in [docs/GROWTH.md](docs/GROWTH.md). Starter tasks are in [docs/GOOD_FIRST_ISSUES.md](docs/GOOD_FIRST_ISSUES.md). Do not fake npm downloads, stars, or installs.
 
 ## Privacy
 

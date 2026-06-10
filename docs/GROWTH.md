@@ -8,6 +8,7 @@ Generate fake-data demo assets:
 
 ```bash
 digital-brain demo-proof --out ./demo-assets
+digital-brain showcase --out ./demo-assets
 ```
 
 This writes:
@@ -82,3 +83,11 @@ Local event copies are written to:
 3. Reddit posts with fake-data Obsidian screenshots.
 4. LinkedIn/X posts with a short demo video.
 5. Product Hunt later, after setup and demos are smooth.
+
+## Star Growth Loop
+
+- Keep the README above the fold clear: value prop, GIF, install, privacy.
+- Ask users to share fake-data or redacted graph screenshots.
+- Convert repeated questions into docs, issues, or good-first-issue labels.
+- Keep integration requests visible so contributors can pick sources.
+- Prefer real user proof over broad AI marketing.

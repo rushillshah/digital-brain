@@ -313,6 +313,16 @@ test("demo-proof writes fake-data launch assets", () => {
   assert.match(read(path.join(out, "README.md")), /npm: https:\/\/www\.npmjs\.com\/package\/digital-brain/);
 });
 
+test("showcase aliases demo-proof for shareable fake-data assets", () => {
+  const root = tempDir();
+  const out = path.join(root, "showcase");
+
+  run([cli, "showcase", "--out", out]);
+
+  assert.ok(fs.existsSync(path.join(out, "sample-vault", "06 AI Memory", "Person Reply Context.md")));
+  assert.match(read(path.join(out, "README.md")), /Digital Brain Demo Proof Assets/);
+});
+
 test("interpreter infers roles from conversation evidence, not just contact names", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
