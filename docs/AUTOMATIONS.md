@@ -45,6 +45,7 @@ Important defaults:
 - skipped always-on interval uses 5 minutes, with a hard minimum of 1 minute
 - skipped active window uses `08:00-12:00`
 - skipped outbound mode uses draft-only
+- auto-send mode can be selected during init, but only after the responsibility check
 - skipped AI pointers are added during the guided quiz
 
 The answers are saved in:
@@ -63,7 +64,7 @@ digital-brain init --full-auto
 
 Auto mode configures local always-on refreshes with a 5 minute default interval. It still uses the local watch script, so it only runs while the machine and runner are awake.
 
-During the guided quiz, always-on and send-with-confirmation require an explicit responsibility check. Pressing Enter does not approve that check. If it is skipped, Digital Brain falls back to manual refresh and draft-only outbound.
+During the guided quiz, always-on, send-with-confirmation, and auto-send require an explicit responsibility check. Pressing Enter does not approve that check. If it is skipped, Digital Brain falls back to manual refresh and draft-only outbound.
 
 ## Codex App
 
@@ -107,6 +108,12 @@ Auto-send while the command is running:
 
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
+```
+
+If you selected `Auto-send while running` during init, `auto-whatsapp` can send without `--yes` while it is running:
+
+```bash
+digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 ```
 
 Guardrails:

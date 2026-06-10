@@ -20,7 +20,7 @@ const allow = parseList(args.allow || "");
 const deny = parseList(args.deny || "");
 const allowAll = Boolean(args["allow-all"]);
 const includeGroups = Boolean(args["include-groups"]);
-const sendEnabled = Boolean(args.yes);
+const sendEnabled = Boolean(args.yes) || config.outboundMode === "auto-send";
 const processUnreadOnStart = !Boolean(args["no-process-unread"]);
 const cooldownMinutes = numberArg("cooldown-minutes", 20);
 const maxRepliesPerChat = numberArg("max-replies-per-chat", 5);
@@ -54,7 +54,7 @@ client.on("qr", (qr) => {
 
 client.on("ready", async () => {
   console.log(`Digital Brain WhatsApp auto-reply running with Ollama model: ${model}`);
-  console.log(sendEnabled ? "Auto-send is enabled." : "Draft mode. Replies will be logged but not sent. Add --yes to send.");
+  console.log(sendEnabled ? "Auto-send is enabled." : "Draft mode. Replies will be logged but not sent. Add --yes or set outboundMode=auto-send to send.");
   console.log(allowAll ? "Allowlist: all chats." : `Allowlist: ${allow.join(", ")}`);
   try {
     if (processUnreadOnStart) {

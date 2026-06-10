@@ -86,6 +86,42 @@ test("full-auto init configures always-on local refresh", () => {
   assert.match(read(path.join(vault, "Tools", "digital-brain-watch.sh")), /INTERVAL_MINUTES="5"/);
 });
 
+test("init can configure WhatsApp auto-send mode explicitly", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  run([
+    cli,
+    "init",
+    vault,
+    "--yes",
+    "--outbound-mode",
+    "auto-send",
+    "--responsibility-accepted=true",
+    "--connect-ai=false",
+  ], { HOME: testHome(root) });
+
+  const config = readJson(path.join(vault, "digital-brain.config.json"));
+  assert.equal(config.outboundMode, "auto-send");
+  assert.equal(config.responsibilityAccepted, true);
+});
+
+test("noninteractive auto-send init requires responsibility acceptance", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const result = runRaw([
+    cli,
+    "init",
+    vault,
+    "--yes",
+    "--outbound-mode",
+    "auto-send",
+    "--connect-ai=false",
+  ], { HOME: testHome(root) });
+
+  assert.notEqual(result.status, 0);
+  assert.match(`${result.stdout}\n${result.stderr}`, /requires explicit responsibility acceptance/);
+});
+
 test("init clamps always-on interval to one minute", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");

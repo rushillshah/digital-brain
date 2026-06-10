@@ -52,7 +52,7 @@ async function init(argv, args) {
   let privacyMode = args["privacy-mode"] || "standard";
   let sourceMarkdownMode = args["source-markdown-mode"] || "none";
   let selectedSources = parseList(args.sources || "whatsapp");
-  let responsibilityAccepted = fullAuto || schedule === "always-on";
+  let responsibilityAccepted = toBoolean(args["responsibility-accepted"]) || fullAuto || schedule === "always-on";
 
   if (!args.yes) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -103,16 +103,21 @@ async function init(argv, args) {
       ["disabled", "Disabled", "Never prepares WhatsApp sends.", "🔒"],
       ["draft", "Draft only", "Prepares text and requires you to send it.", "✍️"],
       ["send-with-confirmation", "Send with confirmation", "Can send only after explicit command confirmation.", "✅"],
+      ["auto-send", "Auto-send while running", "Lets auto-whatsapp send from allowlisted chats while it is running.", "🚦"],
     ], outboundMode);
     connectAi = await confirm(rl, "🔗 Add global AI pointers for Codex/Claude/Gemini?", true);
     responsibilityAccepted = await responsibilityGate(rl, { schedule, outboundMode });
-    if (!responsibilityAccepted && (schedule === "always-on" || outboundMode === "send-with-confirmation")) {
+    if (!responsibilityAccepted && needsResponsibilityGate({ schedule, outboundMode })) {
       console.log("Full-auto/outbound confirmation was not accepted. Using manual refresh and draft-only outbound.");
       schedule = "manual";
       outboundMode = "draft";
       setupMode = "guided";
     }
     rl.close();
+  }
+
+  if (args.yes && needsResponsibilityGate({ schedule, outboundMode }) && !responsibilityAccepted) {
+    throw new Error("This mode requires explicit responsibility acceptance. Re-run with --responsibility-accepted=true or use draft mode.");
   }
 
   ensureDir(vault);
@@ -503,7 +508,7 @@ async function confirm(rl, label, fallback) {
 }
 
 async function responsibilityGate(rl, { schedule, outboundMode }) {
-  const needsGate = schedule === "always-on" || outboundMode === "send-with-confirmation";
+  const needsGate = needsResponsibilityGate({ schedule, outboundMode });
   if (!needsGate) return true;
   console.log("");
   console.log("⚠️  Responsibility check:");
@@ -511,6 +516,10 @@ async function responsibilityGate(rl, { schedule, outboundMode }) {
   console.log("  You are responsible for consent, privacy, message content, and any sends triggered from this machine.");
   console.log("  Enter does not approve this mode.");
   return confirm(rl, "I understand and want this mode enabled", false);
+}
+
+function needsResponsibilityGate({ schedule, outboundMode }) {
+  return schedule === "always-on" || ["send-with-confirmation", "auto-send"].includes(outboundMode);
 }
 
 function letterFor(index) {

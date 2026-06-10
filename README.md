@@ -81,7 +81,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Generate "how to continue this relationship" notes.
 - Generate reply-ready person context that keeps WhatsApp, iMessage, Slack, and LinkedIn evidence separate under the same person.
 - Create AI-readable memory files for future prompts.
-- Draft WhatsApp sends by default, and only send with explicit `--yes`.
+- Draft WhatsApp sends by default, send with explicit `--yes`, or configure auto-send mode during init.
 - Run an explicit WhatsApp auto-responder that uses local Ollama plus vault memory while the command is running.
 - Enforce an AI-disclosure guard after repeated AI-assisted sends.
 
@@ -115,7 +115,7 @@ digital-brain interpret
 
 The sender drafts by default. Add `--yes` to actually send.
 
-The auto-responder is opt-in and runs only while the command is active. On startup it scans unread WhatsApp Web chats, then listens for new messages. It requires an allowlist unless you explicitly pass `--allow-all`. Without `--yes`, it only logs drafts:
+The auto-responder is opt-in and runs only while the command is active. On startup it scans unread WhatsApp Web chats, then listens for new messages. It requires an allowlist unless you explicitly pass `--allow-all`. Without `--yes`, it only logs drafts unless you selected `Auto-send while running` during init:
 
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1
