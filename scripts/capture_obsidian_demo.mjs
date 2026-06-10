@@ -73,6 +73,17 @@ async function capture(client, filename) {
   fs.writeFileSync(path.join(OUT_DIR, filename), Buffer.from(result.data, "base64"));
 }
 
+async function openGraphView(client) {
+  const expression = `
+    (async () => {
+      app.commands.executeCommandById("graph:open");
+      return document.title;
+    })()
+  `;
+  await client.send("Runtime.evaluate", { expression, awaitPromise: true });
+  await wait(1800);
+}
+
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
 const wsUrl = await getTarget();
@@ -103,6 +114,10 @@ try {
     await capture(client, filename);
     console.log(`Captured ${filename}`);
   }
+
+  await openGraphView(client);
+  await capture(client, "obsidian-graph-mode.png");
+  console.log("Captured obsidian-graph-mode.png");
 } finally {
   client.close();
 }

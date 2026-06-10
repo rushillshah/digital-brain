@@ -16,9 +16,13 @@ Digital Brain writes a real Obsidian-compatible vault. These screenshots are fro
 | --- | --- |
 | ![Digital Brain Obsidian overview](docs/assets/obsidian-overview.png) | ![Digital Brain Obsidian person context](docs/assets/obsidian-person-context.png) |
 
-| Life graph | Conversation continuity |
+| Native Obsidian graph mode | Life graph |
 | --- | --- |
-| ![Digital Brain Obsidian life graph](docs/assets/obsidian-life-graph.png) | ![Digital Brain Obsidian continuity memory](docs/assets/obsidian-context.png) |
+| ![Digital Brain native Obsidian graph mode](docs/assets/obsidian-graph-mode.png) | ![Digital Brain Obsidian life graph](docs/assets/obsidian-life-graph.png) |
+
+| Conversation continuity |
+| --- |
+| ![Digital Brain Obsidian continuity memory](docs/assets/obsidian-context.png) |
 
 ## Why
 
