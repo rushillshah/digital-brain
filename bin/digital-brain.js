@@ -71,7 +71,7 @@ async function init(argv, args) {
     if (setupMode === "full-auto") {
       schedule = "always-on";
       console.log("");
-      console.log("⚡ Auto mode selected: always-on local refresh, draft-first outbound, AI disclosure guard enabled.");
+      console.log("⚡ Auto mode selected: always-on local refresh. WhatsApp outbound mode is still configurable below.");
     } else {
       schedule = await select(rl, "Refresh cadence", [
         ["manual", "Manual", "Only runs when you run a command.", "🖐️"],
