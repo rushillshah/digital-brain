@@ -5,6 +5,7 @@ node_modules/
 dist/
 coverage/
 *.tgz
+demo-assets/
 __pycache__/
 *.pyc
 

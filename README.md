@@ -6,6 +6,20 @@ Digital Brain turns your local notes and message history into an editable memory
 
 It is not a chatbot. It is not a cloud memory service. It is the local context layer that makes your existing AI tools feel less generic.
 
+![Digital Brain demo](docs/assets/digital-brain-demo.gif)
+
+## Demo
+
+Digital Brain turns your digital footprint into local AI memory.
+
+| Life graph | Person memory |
+| --- | --- |
+| ![Digital Brain life context graph](docs/assets/life-graph.png) | ![Digital Brain person reply context](docs/assets/person-context.png) |
+
+| Install flow | Relationship evidence |
+| --- | --- |
+| ![Digital Brain terminal demo](docs/assets/terminal-demo.png) | ![Digital Brain relationship evidence](docs/assets/relationship-evidence.png) |
+
 ## Why
 
 AI tools are powerful, but they usually start every personal question cold.
