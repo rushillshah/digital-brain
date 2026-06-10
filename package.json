@@ -1,6 +1,6 @@
 {
   "name": "digital-brain",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Your private digital imprint for AI assistants.",
   "type": "module",
   "bin": {
