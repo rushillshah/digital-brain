@@ -470,6 +470,7 @@ function readMemoryContext(chatName) {
     path.join(vault, "06 AI Memory", "Person Context Index.md"),
     path.join(vault, "06 AI Memory", "Interpreted Relationship Memory.md"),
     path.join(vault, "06 AI Memory", "Project Context.md"),
+    path.join(vault, "06 AI Memory", "Conversation Continuity.md"),
     path.join(vault, "06 AI Memory", "What AI Should Remember.md"),
   ];
   const chunks = files
@@ -1043,6 +1044,7 @@ function logDraft(name, reply, trigger) {
   const record = baseRecord(name, reply, trigger);
   appendLog("auto-drafts.jsonl", record);
   fs.appendFileSync(path.join(outboundDir, "Auto Drafts.md"), `- ${record.timestamp} | ${name}: ${visibleMessage(record, reply)}\n`);
+  updateConversationContinuity(name, reply, trigger, "drafted");
 }
 
 function logSent(name, reply, sent, trigger) {
@@ -1054,6 +1056,7 @@ function logSent(name, reply, sent, trigger) {
     appendLog("sent.jsonl", record);
     fs.appendFileSync(path.join(outboundDir, "Sent.md"), `- ${record.timestamp} | ${name}: ${visibleMessage(record, reply)}\n`);
   }
+  updateConversationContinuity(name, reply, trigger, "sent");
 }
 
 function baseRecord(name, reply, trigger) {
@@ -1074,6 +1077,47 @@ function baseRecord(name, reply, trigger) {
 
 function appendLog(filename, record) {
   fs.appendFileSync(path.join(outboundDir, filename), `${JSON.stringify(record)}\n`);
+}
+
+function updateConversationContinuity(name, reply, trigger, status) {
+  const memoryDir = path.join(vault, "06 AI Memory");
+  const sourceDir = path.join(outboundDir, "Continuity");
+  fs.mkdirSync(memoryDir, { recursive: true });
+  fs.mkdirSync(sourceDir, { recursive: true });
+  const jsonPath = path.join(sourceDir, "conversation-continuity.json");
+  const state = fs.existsSync(jsonPath) ? parseJsonLine(fs.readFileSync(jsonPath, "utf8")) || {} : {};
+  state[name] = {
+    chatName: name,
+    updatedAt: new Date().toISOString(),
+    status,
+    lastInbound: compact(trigger.body || "[non-text message]"),
+    lastAiReply: compact(reply),
+    triggerMessageId: trigger.id?._serialized || null,
+  };
+  writeJsonAtomic(jsonPath, state);
+  writeConversationContinuityMarkdown(path.join(memoryDir, "Conversation Continuity.md"), state);
+}
+
+function writeConversationContinuityMarkdown(file, state) {
+  const rows = Object.values(state)
+    .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+    .slice(0, 80);
+  const lines = [
+    "# Conversation Continuity",
+    "",
+    "Generated from AI-assisted WhatsApp drafts/sends. Use this to remember where conversations were left off.",
+    "",
+  ];
+  for (const row of rows) {
+    lines.push(`## ${row.chatName}`);
+    lines.push("");
+    lines.push(`- Updated: ${row.updatedAt}`);
+    lines.push(`- Status: ${row.status}`);
+    lines.push(`- Last inbound: ${row.lastInbound || "[empty]"}`);
+    lines.push(`- Last AI reply: ${row.lastAiReply || "[empty]"}`);
+    lines.push("");
+  }
+  writeFileAtomic(file, `${lines.join("\n").trim()}\n`);
 }
 
 function disclosureStatus(chatNameValue) {
@@ -1120,6 +1164,12 @@ function loadState() {
 function writeJsonAtomic(file, value) {
   const temp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`);
+  fs.renameSync(temp, file);
+}
+
+function writeFileAtomic(file, value) {
+  const temp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, value);
   fs.renameSync(temp, file);
 }
 

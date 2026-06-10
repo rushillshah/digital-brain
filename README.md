@@ -99,6 +99,7 @@ digital-brain sync-imessage --days 30
 digital-brain import-slack --input ./slack-export.zip
 digital-brain import-linkedin --input ./linkedin-archive.zip
 digital-brain import-repos --input ./codewiser-frontend --input ./codewiser-backend
+digital-brain connect-repos
 digital-brain send-whatsapp --to "Name" --message "text"
 digital-brain auto-whatsapp --allow "Name" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
@@ -118,6 +119,8 @@ While `auto-whatsapp` is running in a focused terminal, press `Space` to pause/r
 Slack and LinkedIn are import-based. Digital Brain reads official export archives; it does not scrape LinkedIn or automate private app UIs. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 Repository context is local-first too. During `init`, choose `Git repositories`, then `Connect GitHub` to use the GitHub CLI auth flow, pick allowed repos, and clone/pull them into `~/.digital-brain/github-repos`. You can also skip GitHub and use local paths. `import-repos` reads high-level repo artifacts, not full source dumps, and writes `06 AI Memory/Project Context.md` plus per-repo notes under `08 Sources/Repositories`.
+
+You can add repository context later with `digital-brain connect-repos`; it updates the vault config and imports the selected repos. Auto-reply also maintains `06 AI Memory/Conversation Continuity.md` after AI-assisted drafts/sends so future replies know where each conversation was left off.
 
 Use `digital-brain doctor` or `digital-brain tutorial` anytime to see dependency status and next steps.
 

@@ -36,6 +36,7 @@ async function main() {
   else if (command === "import-slack") runPython("digital_brain_slack_export_import.py", argv);
   else if (command === "import-linkedin") runPython("digital_brain_linkedin_export_import.py", argv);
   else if (command === "import-repos") runPython("digital_brain_repo_context_import.py", argv);
+  else if (command === "connect-repos") await connectRepos(argv, args);
   else if (command === "extract") runPython("digital_brain_relationship_extractor.py", argv);
   else if (command === "interpret") runPython("digital_brain_relationship_interpreter.py", argv);
   else if (command === "send-whatsapp") runNode("whatsapp-web/send.mjs", argv);
@@ -301,6 +302,30 @@ function runRefresh(argv, args) {
     if ((result.status ?? 1) !== 0) process.exit(result.status ?? 1);
   }
   console.log("\nDigital Brain refresh complete.");
+}
+
+async function connectRepos(argv, args) {
+  const vault = getVaultFromArgs(argv);
+  const config = readVaultConfig(vault);
+  let repoPaths = parseList(args["repo-paths"] || args.repos || "");
+  if (!repoPaths.length && args.input) repoPaths = Array.isArray(args.input) ? args.input : [args.input];
+  if (!repoPaths.length || !toBoolean(args.yes)) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    repoPaths = await configureRepositoryContext(rl, args, repoPaths.length ? repoPaths : config.repoPaths || []);
+    rl.close();
+  }
+  if (!repoPaths.length) {
+    console.log("No repositories selected.");
+    return;
+  }
+  config.selectedSources = Array.from(new Set([...(config.selectedSources || []), "repos"]));
+  config.repoPaths = repoPaths;
+  writeConfig(vault, config);
+  console.log(`Saved ${repoPaths.length} repository path(s) to ${path.join(vault, "digital-brain.config.json")}.`);
+  if (!toBoolean(args["skip-import"])) {
+    const result = runPythonStep("digital_brain_repo_context_import.py", ["--vault", vault, ...repoPaths.flatMap((repoPath) => ["--input", repoPath])]);
+    if ((result.status ?? 1) !== 0) process.exit(result.status ?? 1);
+  }
 }
 
 function runPythonStep(script, argv) {
@@ -884,18 +909,29 @@ function parseArgs(argv) {
     const key = arg.slice(2);
     if (key.includes("=")) {
       const [k, ...rest] = key.split("=");
-      out[k] = rest.join("=");
+      setArg(out, k, rest.join("="));
     } else {
       const next = argv[i + 1];
-      if (!next || next.startsWith("--")) out[key] = true;
-      else out[key] = argv[++i];
+      if (!next || next.startsWith("--")) setArg(out, key, true);
+      else setArg(out, key, argv[++i]);
     }
   }
   return out;
 }
 
+function setArg(out, key, value) {
+  if (out[key] === undefined) {
+    out[key] = value;
+  } else if (Array.isArray(out[key])) {
+    out[key].push(value);
+  } else {
+    out[key] = [out[key], value];
+  }
+}
+
 function parseList(value) {
   if (!value) return [];
+  if (Array.isArray(value)) return value.flatMap((item) => parseList(item));
   return String(value).split(",").map((item) => item.trim()).filter(Boolean);
 }
 
@@ -937,6 +973,7 @@ Usage:
   digital-brain import-slack --input slack-export.zip
   digital-brain import-linkedin --input linkedin-archive.zip
   digital-brain import-repos --input /path/to/repo --input /path/to/another-repo
+  digital-brain connect-repos
   digital-brain extract --days 30
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]

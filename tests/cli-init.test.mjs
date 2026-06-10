@@ -543,6 +543,22 @@ test("import-repos writes project context from local repositories", () => {
   assert.equal(records[0].name, "codewiser-frontend");
 });
 
+test("connect-repos can add repository context after init", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const project = path.join(root, "later-repo");
+  fs.mkdirSync(project, { recursive: true });
+  fs.writeFileSync(path.join(project, "README.md"), "# Later Repo\n\nAdded after setup.\n");
+
+  run([cli, "init", vault, "--yes", "--connect-ai=false"], { HOME: testHome(root) });
+  run([cli, "connect-repos", "--vault", vault, "--yes", "--input", project]);
+
+  const config = readJson(path.join(vault, "digital-brain.config.json"));
+  assert.ok(config.selectedSources.includes("repos"));
+  assert.deepEqual(config.repoPaths, [project]);
+  assert.match(read(path.join(vault, "06 AI Memory", "Project Context.md")), /Later Repo/);
+});
+
 test("init supports GitHub CLI repository onboarding", () => {
   const source = read(path.join(repo, "bin", "digital-brain.js"));
   assert.match(source, /Connect GitHub/);
@@ -551,6 +567,16 @@ test("init supports GitHub CLI repository onboarding", () => {
   assert.match(source, /"repo", "list"/);
   assert.match(source, /cloneOrPullRepo/);
   assert.match(source, /\.digital-brain", "github-repos"/);
+});
+
+test("auto-whatsapp updates conversation continuity memory", () => {
+  const source = read(path.join(repo, "whatsapp-web", "auto-reply.mjs"));
+  assert.match(source, /Conversation Continuity\.md/);
+  assert.match(source, /conversation-continuity\.json/);
+  assert.match(source, /updateConversationContinuity/);
+  assert.match(source, /Generated from AI-assisted WhatsApp drafts\/sends/);
+  assert.match(source, /Last inbound/);
+  assert.match(source, /Last AI reply/);
 });
 
 test("extract skips corrupt JSONL and keeps valid records", () => {
