@@ -431,6 +431,7 @@ function readMemoryContext(chatName) {
     path.join(vault, "06 AI Memory", "Person Reply Context.md"),
     path.join(vault, "06 AI Memory", "Person Context Index.md"),
     path.join(vault, "06 AI Memory", "Interpreted Relationship Memory.md"),
+    path.join(vault, "06 AI Memory", "Project Context.md"),
     path.join(vault, "06 AI Memory", "What AI Should Remember.md"),
   ];
   const chunks = files

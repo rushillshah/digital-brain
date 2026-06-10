@@ -81,6 +81,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Extract your own outbound communication style so drafts can match your casing, slang, punctuation, lexical patterns, and common phrase shapes.
 - Generate "how to continue this relationship" notes.
 - Generate reply-ready person context that keeps WhatsApp, iMessage, Slack, and LinkedIn evidence separate under the same person.
+- Generate project context from local Git repositories using READMEs, manifests, remotes, and recent commits.
 - Create AI-readable memory files for future prompts.
 - Draft WhatsApp sends by default, send with explicit `--yes`, or configure auto-send mode during init.
 - Run an explicit WhatsApp auto-responder that uses Ollama, OpenAI, Anthropic, xAI, or Codex plus vault memory while the command is running.
@@ -97,6 +98,7 @@ digital-brain doctor
 digital-brain sync-imessage --days 30
 digital-brain import-slack --input ./slack-export.zip
 digital-brain import-linkedin --input ./linkedin-archive.zip
+digital-brain import-repos --input ./codewiser-frontend --input ./codewiser-backend
 digital-brain send-whatsapp --to "Name" --message "text"
 digital-brain auto-whatsapp --allow "Name" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
@@ -114,6 +116,8 @@ While `auto-whatsapp` is running in a focused terminal, press `Space` to pause/r
 `init` remembers your vault globally, so `run` works from anywhere. `run` syncs the live local sources you selected, extracts relationships, and writes interpreted memory in one command.
 
 Slack and LinkedIn are import-based. Digital Brain reads official export archives; it does not scrape LinkedIn or automate private app UIs. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+
+Repository context is local-first too. `import-repos` reads high-level repo artifacts, not full source dumps, and writes `06 AI Memory/Project Context.md` plus per-repo notes under `08 Sources/Repositories`.
 
 Use `digital-brain doctor` or `digital-brain tutorial` anytime to see dependency status and next steps.
 

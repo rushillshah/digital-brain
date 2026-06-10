@@ -501,6 +501,40 @@ test("slack and linkedin imports feed relationship memory", () => {
   assert.match(read(path.join(vault, "04 People", "LinkedIn Connections.md")), /Ada Lovelace/);
 });
 
+test("import-repos writes project context from local repositories", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const project = path.join(root, "codewiser-frontend");
+  fs.mkdirSync(project, { recursive: true });
+  fs.writeFileSync(path.join(project, "README.md"), "# CodeWiser Frontend\n\nFrontend app for readiness and review workflows.\n");
+  fs.writeFileSync(path.join(project, "package.json"), JSON.stringify({
+    name: "codewiser-frontend",
+    scripts: { dev: "next dev" },
+    dependencies: { next: "^15.0.0" },
+  }, null, 2));
+
+  run([
+    cli,
+    "init",
+    vault,
+    "--yes",
+    "--sources",
+    "repos",
+    "--repo-paths",
+    project,
+    "--connect-ai=false",
+  ], { HOME: testHome(root) });
+  run([cli, "import-repos", "--vault", vault, "--input", project]);
+
+  const config = readJson(path.join(vault, "digital-brain.config.json"));
+  assert.deepEqual(config.selectedSources, ["repos"]);
+  assert.deepEqual(config.repoPaths, [project]);
+  assert.match(read(path.join(vault, "06 AI Memory", "Project Context.md")), /CodeWiser Frontend/);
+  assert.match(read(path.join(vault, "08 Sources", "Repositories", "codewiser-frontend.md")), /package\.json/);
+  const records = readJson(path.join(vault, "08 Sources", "Repositories", "repository_context.json"));
+  assert.equal(records[0].name, "codewiser-frontend");
+});
+
 test("extract skips corrupt JSONL and keeps valid records", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");

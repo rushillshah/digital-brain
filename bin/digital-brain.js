@@ -35,6 +35,7 @@ async function main() {
   else if (command === "sync-imessage") runPython("digital_brain_imessage_sync.py", argv);
   else if (command === "import-slack") runPython("digital_brain_slack_export_import.py", argv);
   else if (command === "import-linkedin") runPython("digital_brain_linkedin_export_import.py", argv);
+  else if (command === "import-repos") runPython("digital_brain_repo_context_import.py", argv);
   else if (command === "extract") runPython("digital_brain_relationship_extractor.py", argv);
   else if (command === "interpret") runPython("digital_brain_relationship_interpreter.py", argv);
   else if (command === "send-whatsapp") runNode("whatsapp-web/send.mjs", argv);
@@ -66,6 +67,7 @@ async function init(argv, args) {
   let xaiApiKey = args["xai-api-key"] || "";
   let autoReplyModel = args.model || providerSpecificModelArg(args, autoReplyProvider) || defaultModelForProvider(autoReplyProvider);
   let replyStyleMode = args["reply-style-mode"] || "match-user";
+  let repoPaths = parseList(args["repo-paths"] || args.repos || "");
   let privacyMode = args["privacy-mode"] || "standard";
   let sourceMarkdownMode = args["source-markdown-mode"] || "none";
   let selectedSources = parseList(args.sources || "whatsapp");
@@ -111,7 +113,12 @@ async function init(argv, args) {
       ["imessage", "Apple iMessage", "Live local sync from macOS Messages database.", "💬"],
       ["slack", "Slack export", "Import official Slack workspace export ZIP/folder.", "🧵"],
       ["linkedin", "LinkedIn archive", "Import official LinkedIn data archive ZIP/folder.", "💼"],
+      ["repos", "Git repositories", "Index local repo READMEs, manifests, remotes, and recent commits.", "📦"],
     ], selectedSources);
+    if (selectedSources.includes("repos")) {
+      const answer = await ask(rl, "📦 Repository paths", repoPaths.join(", "), "Comma-separated local repo folders. You can leave blank and run import-repos later.");
+      repoPaths = parseList(answer);
+    }
     privacyMode = await select(rl, "Privacy mode", [
       ["standard", "Standard", "Keep raw JSONL locally for analysis, but do not generate raw chat Markdown.", "🔐"],
       ["metadata-only", "Metadata only", "Store timestamps and participants, but omit message bodies.", "🧼"],
@@ -187,6 +194,7 @@ async function init(argv, args) {
     privacyMode,
     sourceMarkdownMode,
     selectedSources,
+    repoPaths,
     outboundLogMode: args["outbound-log-mode"] || "metadata",
     setupMode,
     responsibilityAccepted,
@@ -258,7 +266,9 @@ function runRefresh(argv, args) {
   const markdownMode = args["markdown-mode"] || config.sourceMarkdownMode || "none";
   const privacyMode = args["privacy-mode"] || config.privacyMode || "standard";
   const selectedSources = parseList(args.sources || "").length ? parseList(args.sources) : config.selectedSources || ["whatsapp"];
+  const repoPaths = parseList(args["repo-paths"] || args.repos || "").length ? parseList(args["repo-paths"] || args.repos) : config.repoPaths || [];
   const syncArgs = ["--vault", vault, "--days", days, "--markdown-mode", markdownMode, "--privacy-mode", privacyMode];
+  const repoArgs = ["--vault", vault, ...repoPaths.flatMap((repoPath) => ["--input", repoPath])];
   const extractArgs = ["--vault", vault, "--days", days];
   const interpretArgs = ["--vault", vault, "--days", days];
   if (args["min-messages"]) extractArgs.push("--min-messages", String(args["min-messages"]));
@@ -269,6 +279,7 @@ function runRefresh(argv, args) {
     if (selectedSources.includes("imessage")) console.log(`  sync iMessage: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
     if (selectedSources.includes("slack")) console.log("  Slack: import-only; run digital-brain import-slack --input <export.zip>");
     if (selectedSources.includes("linkedin")) console.log("  LinkedIn: import-only; run digital-brain import-linkedin --input <archive.zip>");
+    if (selectedSources.includes("repos")) console.log(repoPaths.length ? `  repos: ${repoPaths.length} configured path(s)` : "  repos: no paths configured; run digital-brain import-repos --input <repo>");
     console.log(`  extract relationships: days=${days}`);
     console.log(`  interpret relationship drafts: days=${days}`);
     return;
@@ -276,6 +287,8 @@ function runRefresh(argv, args) {
   const steps = [];
   if (selectedSources.includes("whatsapp")) steps.push(["sync WhatsApp", "sync-whatsapp", "digital_brain_whatsapp_mac_sync.py", syncArgs]);
   if (selectedSources.includes("imessage")) steps.push(["sync iMessage", "sync-imessage", "digital_brain_imessage_sync.py", syncArgs]);
+  if (selectedSources.includes("repos") && repoPaths.length) steps.push(["import repos", "import-repos", "digital_brain_repo_context_import.py", repoArgs]);
+  if (selectedSources.includes("repos") && !repoPaths.length) console.log("\n→ import repos skipped: no repoPaths configured");
   steps.push(
     ["extract", "extract", "digital_brain_relationship_extractor.py", extractArgs],
     ["interpret", "interpret", "digital_brain_relationship_interpreter.py", interpretArgs],
@@ -806,6 +819,7 @@ Usage:
   digital-brain sync-imessage --days 30
   digital-brain import-slack --input slack-export.zip
   digital-brain import-linkedin --input linkedin-archive.zip
+  digital-brain import-repos --input /path/to/repo --input /path/to/another-repo
   digital-brain extract --days 30
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]

@@ -33,6 +33,7 @@ digital-brain run
 - WhatsApp outbound mode
 - WhatsApp auto-reply provider: Ollama, OpenAI API, Anthropic API, xAI API, Codex app bridge, or Codex CLI
 - AI reply style: match learned style, casual imperfect, or clean/formal
+- optional local Git repositories for project context
 - whether to add AI adapter pointers
 
 Most questions are multiple choice. Pick with `A/B/C`, `1/2/3`, the exact value, or press Enter to use the displayed default.
@@ -96,6 +97,17 @@ For 24/7 local polling, run:
 ```
 
 The generated script loops forever and sleeps for `refreshIntervalMinutes`. The minimum supported interval is 1 minute. A practical default is 5 minutes.
+
+## Repository Context
+
+Use repository context when you want the vault to know what projects you are actively building without copying entire source trees into Obsidian.
+
+```bash
+digital-brain import-repos --input /path/to/codewiser-frontend --input /path/to/codewiser-backend
+digital-brain run --sources repos --repo-paths "/path/to/codewiser-frontend,/path/to/codewiser-backend"
+```
+
+The importer reads READMEs, common manifests such as `package.json` and `pyproject.toml`, git remotes, current branches, recent commit messages, and top-level file names. It writes `06 AI Memory/Project Context.md` for AI context and detailed generated notes under `08 Sources/Repositories`.
 
 ## WhatsApp Auto-Reply
 
