@@ -95,7 +95,7 @@ The generated script loops forever and sleeps for `refreshIntervalMinutes`. The 
 
 ## WhatsApp Auto-Reply
 
-`digital-brain auto-whatsapp` is separate from refresh automation. It uses WhatsApp Web for live incoming messages and Ollama for local reply generation.
+`digital-brain auto-whatsapp` is separate from refresh automation. It uses WhatsApp Web for live incoming messages and Ollama for local reply generation. On startup it scans unread WhatsApp Web chats, then continues listening for new messages.
 
 Draft-only:
 
@@ -114,6 +114,7 @@ Guardrails:
 - requires Ollama running locally
 - requires the selected model, for example `ollama pull llama3.1`
 - requires `--allow "Name"` unless `--allow-all` is explicitly passed
+- processes unread chats on startup unless `--no-process-unread` is passed
 - skips groups unless `--include-groups` is passed
 - uses a per-chat cooldown, default 20 minutes
 - caps replies per chat per run, default 5

@@ -21,6 +21,7 @@ const deny = parseList(args.deny || "");
 const allowAll = Boolean(args["allow-all"]);
 const includeGroups = Boolean(args["include-groups"]);
 const sendEnabled = Boolean(args.yes);
+const processUnreadOnStart = !Boolean(args["no-process-unread"]);
 const cooldownMinutes = numberArg("cooldown-minutes", 20);
 const maxRepliesPerChat = numberArg("max-replies-per-chat", 5);
 const maxContextChars = numberArg("max-context-chars", 12000);
@@ -51,10 +52,20 @@ client.on("qr", (qr) => {
   qrcode.generate(qr, { small: true });
 });
 
-client.on("ready", () => {
+client.on("ready", async () => {
   console.log(`Digital Brain WhatsApp auto-reply running with Ollama model: ${model}`);
   console.log(sendEnabled ? "Auto-send is enabled." : "Draft mode. Replies will be logged but not sent. Add --yes to send.");
   console.log(allowAll ? "Allowlist: all chats." : `Allowlist: ${allow.join(", ")}`);
+  try {
+    if (processUnreadOnStart) {
+      await processUnreadChats();
+    } else {
+      console.log("Startup unread scan disabled.");
+    }
+  } catch (error) {
+    console.error(`Startup unread scan failed: ${error.message}`);
+  }
+  console.log("Listening for new WhatsApp messages...");
 });
 
 client.on("message", async (message) => {
@@ -67,11 +78,44 @@ client.on("message", async (message) => {
 
 client.initialize();
 
-async function handleMessage(message) {
+async function processUnreadChats() {
+  const chats = await client.getChats();
+  const unreadChats = chats.filter((chat) => Number(chat.unreadCount || 0) > 0);
+  console.log(`Startup unread scan: ${unreadChats.length} unread chat(s).`);
+  for (const chat of unreadChats) {
+    const name = chatName(chat);
+    if (chat.isGroup && !includeGroups) {
+      console.log(`Skipping unread group chat: ${name}`);
+      continue;
+    }
+    if (!isAllowed(name) || isDenied(name)) {
+      console.log(`Skipping unread chat outside allowlist: ${name}`);
+      continue;
+    }
+    if (isCoolingDown(name)) {
+      console.log(`Skipping unread chat during cooldown: ${name}`);
+      continue;
+    }
+    if (replyCount(name) >= maxRepliesPerChat) {
+      console.log(`Skipping unread chat at reply cap: ${name}`);
+      continue;
+    }
+    const recentMessages = await chat.fetchMessages({ limit: Math.max(12, Number(chat.unreadCount || 0) + 3) });
+    const latestInbound = recentMessages.filter((message) => !message.fromMe && !message.isStatus).at(-1);
+    if (!latestInbound) {
+      console.log(`No inbound unread candidate found for: ${name}`);
+      continue;
+    }
+    console.log(`Processing unread chat: ${name}`);
+    await handleMessage(latestInbound, chat);
+  }
+}
+
+async function handleMessage(message, knownChat = null) {
   if (message.fromMe || message.isStatus) return;
   if (state.processedMessageIds.includes(message.id?._serialized)) return;
 
-  const chat = await message.getChat();
+  const chat = knownChat || await message.getChat();
   const name = chatName(chat);
   if (chat.isGroup && !includeGroups) return;
   if (!isAllowed(name)) return;
@@ -351,6 +395,7 @@ function parseArgs(argv) {
     if (arg === "--yes") out.yes = true;
     else if (arg === "--allow-all") out["allow-all"] = true;
     else if (arg === "--include-groups") out["include-groups"] = true;
+    else if (arg === "--no-process-unread") out["no-process-unread"] = true;
     else if (arg.startsWith("--")) {
       const key = arg.slice(2);
       out[key] = argv[++i] || "";

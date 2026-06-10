@@ -584,6 +584,6 @@ Usage:
   digital-brain extract --days 30
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]
-  digital-brain auto-whatsapp --allow "Name" --model llama3.1 [--yes]
+  digital-brain auto-whatsapp --allow "Name" --model llama3.1 [--yes] [--no-process-unread]
 `);
 }

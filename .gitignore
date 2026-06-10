@@ -11,6 +11,7 @@ __pycache__/
 # Never commit personal vault output.
 /Selfprint Vault/
 /Digital Brain Vault/
+.wwebjs_cache/
 *.sqlite
 *.jsonl
 /08 Sources/

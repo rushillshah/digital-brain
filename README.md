@@ -115,11 +115,12 @@ digital-brain interpret
 
 The sender drafts by default. Add `--yes` to actually send.
 
-The auto-responder is opt-in and runs only while the command is active. It requires an allowlist unless you explicitly pass `--allow-all`. Without `--yes`, it only logs drafts:
+The auto-responder is opt-in and runs only while the command is active. On startup it scans unread WhatsApp Web chats, then listens for new messages. It requires an allowlist unless you explicitly pass `--allow-all`. Without `--yes`, it only logs drafts:
 
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
+digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes --no-process-unread
 ```
 
 If Digital Brain has already sent two AI-assisted messages to the same chat in the last 24 hours, the next send must disclose that AI is helping unless you explicitly bypass the check.
