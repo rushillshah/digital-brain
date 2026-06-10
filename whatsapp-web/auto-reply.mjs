@@ -338,7 +338,7 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
   const memory = readMemoryContext(chatName);
   const unansweredInbound = latestUnansweredInbound(recentMessages, incomingBody);
   const selfRecentMessages = recentMessages.filter((item) => item.fromMe && compact(item.body || "")).map((item) => item.body || "");
-  const language = languageProfile(recentMessages);
+  const language = languageProfile(selfRecentMessages);
   const slang = slangProfile(selfRecentMessages);
   const selfExamples = recentMessages
     .filter((item) => item.fromMe && compact(item.body || ""))
@@ -426,7 +426,7 @@ function languageInstruction(profile) {
   if (profile.hasHindi) {
     return "Language guard: this exact chat shows Hindi/Hinglish usage, so light Hindi/Hinglish is allowed only if it matches the user's recent messages here.";
   }
-  return "Language guard: reply in English. Do not use Hindi, Hinglish, romanized Hindi, or words like chal, kar, jaldi, thoda, badh raha, hai, haan, nahi unless the user's recent messages in this exact chat use them.";
+  return "Language guard: reply in English. Never infer Hindi/Hinglish from the recipient's name, family relationship, or location. Do not use Hindi, Hinglish, romanized Hindi, or words like chal, kar, jaldi, thoda, badh raha, hai, haan, nahi unless the user's own recent messages in this exact chat use them.";
 }
 
 function slangProfile(messages) {

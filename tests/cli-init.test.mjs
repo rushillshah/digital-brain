@@ -390,6 +390,8 @@ test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", ()
   assert.match(source, /do not pretend you opened or inspected it/);
   assert.match(source, /Primary style source: the user's recent messages in this exact chat/);
   assert.match(source, /Language guard: reply in English/);
+  assert.match(source, /Never infer Hindi\/Hinglish from the recipient's name, family relationship, or location/);
+  assert.match(source, /user's own recent messages in this exact chat/);
   assert.match(source, /Do not use Hindi, Hinglish, romanized Hindi/);
   assert.match(source, /Slang guard: do not use bro in this chat/);
   assert.match(source, /Do not transfer slang from other chats into this relationship/);
