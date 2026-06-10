@@ -18,6 +18,7 @@ Things to be careful about:
 - Do not enable outbound sending without understanding the risk.
 - Do not use auto-reply for sensitive, legal, medical, financial, emergency, or high-stakes conversations.
 - Treat WhatsApp database access, iMessage database access, and WhatsApp Web automation as local, permission-sensitive integrations that can change.
+- Treat Microsoft Teams exports and Graph sends as tenant-permissioned data; only import/send data you are authorized to access.
 - Always-on mode runs on your machine and inherits your local permissions.
 - You are responsible for consent, privacy, message content, and sends made from your machine.
 - Treat relationship labels as editable working notes, not truth.

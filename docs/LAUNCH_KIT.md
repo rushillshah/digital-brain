@@ -28,7 +28,7 @@ Your life, work, and relationships as a local Obsidian graph that AI can actuall
 I built Digital Brain.
 
 It turns your digital footprint into a local Obsidian graph:
-WhatsApp, iMessage, Slack, LinkedIn exports, Gmail, Calendar, and GitHub repos.
+WhatsApp, iMessage, Slack, Microsoft Teams, LinkedIn exports, Gmail, Calendar, and GitHub repos.
 
 The point is not another chatbot.
 The point is context: who people are, what you are working on, how you talk, and what open loops exist.

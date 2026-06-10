@@ -53,6 +53,7 @@ Useful links:
 - WhatsApp for Mac: https://faq.whatsapp.com/686469079565350
 - Apple Messages: https://support.apple.com/guide/messages/welcome/mac
 - Slack exports: https://slack.com/help/articles/201658943-Export-your-workspace-data
+- Microsoft Teams exports: use Microsoft Graph/Teams export tooling, then run `digital-brain import-teams --input <export.zip|folder>`
 - LinkedIn data archive: https://www.linkedin.com/help/linkedin/answer/a566336
 
 Once setup passes, normal use is:
@@ -67,6 +68,7 @@ Optional imports:
 
 ```bash
 digital-brain import-slack --input ./slack-export.zip
+digital-brain import-teams --input ./teams-export.zip
 digital-brain import-linkedin --input ./linkedin-archive.zip
 digital-brain extract
 digital-brain interpret

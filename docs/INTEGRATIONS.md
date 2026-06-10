@@ -60,6 +60,36 @@ SLACK_BOT_TOKEN="xoxb-..." digital-brain send-slack --channel C123 --message "te
 
 Without `--yes`, the command logs a draft only. The token needs Slack `chat:write` permission and the bot must be in the target channel. This is an outbound primitive, not a full Slack auto-reply loop yet.
 
+## Microsoft Teams
+
+Use Microsoft Teams message export JSON from Microsoft Graph/Teams export tooling. Digital Brain accepts a ZIP, extracted folder, or directory containing Teams JSON files with Graph-style `chatMessage` records.
+
+Export API docs: https://learn.microsoft.com/en-us/microsoftteams/export-teams-content
+
+```bash
+digital-brain import-teams --input ./teams-export.zip --self-email you@example.com
+digital-brain extract
+digital-brain interpret
+```
+
+Teams import writes normalized records under `08 Sources/Microsoft Teams/Raw` and month chat notes under `08 Sources/Microsoft Teams/ChatsByMonth`. Use `--privacy-mode metadata-only` to store message metadata without bodies.
+
+### Microsoft Teams outbound
+
+Digital Brain can send Teams messages through Microsoft Graph:
+
+```bash
+MICROSOFT_GRAPH_TOKEN="..." digital-brain send-teams --chat 19:abc --message "text" --yes
+MICROSOFT_GRAPH_TOKEN="..." digital-brain send-teams --team <team-id> --channel <channel-id> --message "text" --yes
+```
+
+Without `--yes`, the command logs a draft only. The token must be a Microsoft Graph access token with permission to send chat/channel messages in the target tenant. This is an outbound primitive, not a full Teams auto-reply loop yet.
+
+Graph send docs:
+
+- Chat messages: https://learn.microsoft.com/en-us/graph/api/chat-post-messages
+- Channel messages: https://learn.microsoft.com/en-us/graph/api/channel-post-messages
+
 ## LinkedIn
 
 Use LinkedIn's official data archive ZIP or extracted archive folder.

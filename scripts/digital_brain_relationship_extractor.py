@@ -267,7 +267,7 @@ def infer_identity(source, chat_name, messages):
             "evidence": "group chat kept source-specific",
         }
     candidates = []
-    if source in {"Slack", "LinkedIn"}:
+    if source in {"Slack", "LinkedIn", "Microsoft Teams"}:
         candidates.extend((m.get("author") or "").strip() for m in messages if not m.get("fromMe"))
     if source == "LinkedIn":
         candidates.extend((m.get("to") or "").split(",")[0].strip() for m in messages if m.get("fromMe"))
@@ -275,7 +275,7 @@ def infer_identity(source, chat_name, messages):
     name = best_identity_name(candidates) or chat_name
     key = f"person::{normalize_identity(name)}"
     confidence = "medium" if normalize_identity(name) == normalize_identity(chat_name) else "low"
-    if source in {"Slack", "LinkedIn"} and normalize_identity(name) != normalize_identity(chat_name):
+    if source in {"Slack", "LinkedIn", "Microsoft Teams"} and normalize_identity(name) != normalize_identity(chat_name):
         confidence = "medium"
     return {
         "name": name,
@@ -500,6 +500,8 @@ def source_system(message):
     source = message.get("source") or ""
     if "Slack" in source:
         return "Slack"
+    if "Teams" in source:
+        return "Microsoft Teams"
     if "LinkedIn" in source:
         return "LinkedIn"
     if "WhatsApp" in source:

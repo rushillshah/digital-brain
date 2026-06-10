@@ -7,7 +7,7 @@ Digital Brain should become a local life/work context layer, not a cloud memory 
 - Better Obsidian graph output and fake-data demo assets.
 - Safer setup defaults and clearer dependency checks.
 - Stronger role and relationship evidence extraction.
-- WhatsApp, iMessage, Slack, LinkedIn, Gmail, Calendar, and Git repository context.
+- WhatsApp, iMessage, Slack, Microsoft Teams, LinkedIn, Gmail, Calendar, and Git repository context.
 - Provider choice for reply assistance: local Ollama, OpenAI, Anthropic, xAI, Codex CLI, and Codex app bridge.
 
 ## Near-Term

@@ -95,12 +95,13 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - WhatsApp Desktop/Web linked-device import tools.
 - Apple iMessage import tools.
 - Slack export import tools.
+- Microsoft Teams export import tools.
 - LinkedIn data archive import tools.
 - Gmail Takeout import tools.
 - Google Calendar export import tools.
 - Relationship extraction and interpretation models.
 - Optional WhatsApp Web outbound sender.
-- Optional Slack and iMessage outbound senders.
+- Optional Slack, Microsoft Teams, and iMessage outbound senders.
 - A refresh script based on your install-time answers.
 - An optional always-on watch script that can pull every N minutes.
 
@@ -110,6 +111,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Import recent WhatsApp history through a cross-platform WhatsApp Web/Desktop linked-device session.
 - Import recent iMessage history from the local macOS Messages database.
 - Import Slack workspace exports.
+- Import Microsoft Teams message exports from JSON/ZIP/folders.
 - Import LinkedIn data archives for connections and messages when available.
 - Import Gmail Takeout `.mbox` exports into email context.
 - Import Google Calendar `.ics` exports into schedule/life context.
@@ -119,7 +121,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Extract relationship-specific typing style: casing, message length, punctuation, emoji, and slang.
 - Extract your own outbound communication style so drafts can match your casing, slang, punctuation, lexical patterns, and common phrase shapes.
 - Generate "how to continue this relationship" notes.
-- Generate reply-ready person context that keeps WhatsApp, iMessage, Slack, and LinkedIn evidence separate under the same person.
+- Generate reply-ready person context that keeps WhatsApp, iMessage, Slack, Microsoft Teams, and LinkedIn evidence separate under the same person.
 - Generate project context from local Git repositories using READMEs, manifests, remotes, and recent commits.
 - Create AI-readable memory files for future prompts.
 - Draft WhatsApp sends by default, send with explicit `--yes`, or configure auto-send mode during init.
@@ -140,6 +142,7 @@ digital-brain sync-whatsapp --days 30
 digital-brain sync-whatsapp-web --days 30
 digital-brain sync-imessage --days 30
 digital-brain import-slack --input ./slack-export.zip
+digital-brain import-teams --input ./teams-export.zip
 digital-brain import-linkedin --input ./linkedin-archive.zip
 digital-brain import-gmail --input ./takeout.mbox
 digital-brain import-calendar --input ./calendar.ics
@@ -147,6 +150,7 @@ digital-brain import-repos --input ./codewiser-frontend --input ./codewiser-back
 digital-brain connect-repos
 digital-brain send-whatsapp --to "Name" --message "text"
 digital-brain send-slack --channel C123 --message "text"
+digital-brain send-teams --chat 19:abc --message "text"
 digital-brain send-imessage --to "+15551234567" --message "text"
 digital-brain auto-whatsapp --allow "Name" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
@@ -164,7 +168,7 @@ While `auto-whatsapp` is running in a focused terminal, press `Space` to pause/r
 
 `init` remembers your vault globally, so `run` works from anywhere. `run` syncs the live local sources you selected, extracts relationships, and writes interpreted memory in one command.
 
-Slack and LinkedIn are import-based. Digital Brain reads official export archives; it does not scrape LinkedIn or automate private app UIs. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+Slack, Microsoft Teams, and LinkedIn are import-based. Digital Brain reads official export archives; it does not scrape LinkedIn or automate private app UIs. Teams outbound uses Microsoft Graph. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 Repository context is local-first too. During `init`, choose `Git repositories`, then `Connect GitHub` to use the GitHub CLI auth flow, pick allowed repos, and clone/pull them into `~/.digital-brain/github-repos`. You can also skip GitHub and use local paths. `import-repos` reads high-level repo artifacts, not full source dumps, and writes `06 AI Memory/Project Context.md` plus per-repo notes under `08 Sources/Repositories`.
 
@@ -180,6 +184,7 @@ The lower-level commands still exist for debugging:
 digital-brain sync-whatsapp
 digital-brain sync-whatsapp-web
 digital-brain sync-imessage
+digital-brain import-teams
 digital-brain extract
 digital-brain interpret
 ```
@@ -275,7 +280,7 @@ More examples are in [docs/EXAMPLES.md](docs/EXAMPLES.md).
 - This is alpha software and source integrations can break when local app schemas or web sessions change.
 - Relationship roles and same-person matches are provisional working notes, not truth.
 - WhatsApp and iMessage local database access is macOS-specific and permission-sensitive.
-- Slack, LinkedIn, Gmail, and Calendar are import/export based unless otherwise documented.
+- Slack, Microsoft Teams, LinkedIn, Gmail, and Calendar are import/export based unless otherwise documented.
 - Outbound messaging is powerful and risky; keep allowlists narrow and test draft mode first.
 - Hosted AI providers send prompt context to that provider when selected. Local-first does not mean every optional provider is local.
 
@@ -302,7 +307,7 @@ WhatsApp Mac support reads the local macOS WhatsApp database when available. Wha
 
 Apple iMessage support reads the local macOS Messages `chat.db` when available. If the database is missing or inaccessible and iMessage was selected, `digital-brain run` fails with a clear setup error instead of silently skipping it.
 
-Slack support reads Slack workspace export JSON. LinkedIn support reads LinkedIn data archive CSV files when LinkedIn includes the relevant files in your archive.
+Slack support reads Slack workspace export JSON. Microsoft Teams support reads Teams export JSON from ZIPs or folders. LinkedIn support reads LinkedIn data archive CSV files when LinkedIn includes the relevant files in your archive.
 
 Relationship labels are working notes, not truth. You can edit them with `relationship_overrides.json`.
 Role inference records evidence snippets from conversation text when available, but labels are still provisional and should be corrected with overrides where wrong.

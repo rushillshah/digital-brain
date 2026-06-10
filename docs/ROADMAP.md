@@ -7,7 +7,7 @@ Digital Brain should become a local life/work context layer, not a cloud memory 
 - Obsidian-compatible vault output.
 - Native Obsidian graph demo assets.
 - WhatsApp and iMessage local imports.
-- Slack, LinkedIn, Gmail, and Calendar export imports.
+- Slack, Microsoft Teams, LinkedIn, Gmail, and Calendar export imports.
 - Local Git repository context.
 - Relationship evidence, role inference, typing style, and conversation continuity.
 - WhatsApp auto-reply with allowlists and provider choice.

@@ -40,6 +40,7 @@ async function main() {
   else if (command === "import-linkedin") runPython("digital_brain_linkedin_export_import.py", argv);
   else if (command === "import-gmail") runPython("digital_brain_gmail_takeout_import.py", argv);
   else if (command === "import-calendar") runPython("digital_brain_google_calendar_import.py", argv);
+  else if (command === "import-teams") runPython("digital_brain_teams_export_import.py", argv);
   else if (command === "import-repos") runPython("digital_brain_repo_context_import.py", argv);
   else if (command === "connect-repos") await connectRepos(argv, args);
   else if (command === "extract") runPython("digital_brain_relationship_extractor.py", argv);
@@ -47,6 +48,7 @@ async function main() {
   else if (command === "send-whatsapp") runNode("whatsapp-web/send.mjs", argv);
   else if (command === "send-slack") runNode("slack/send.mjs", argv);
   else if (command === "send-imessage") runNode("imessage/send.mjs", argv);
+  else if (command === "send-teams") runNode("teams/send.mjs", argv);
   else if (command === "auto-whatsapp") runNode("whatsapp-web/auto-reply.mjs", argv);
   else if (command === "pause-whatsapp") pauseWhatsApp(argv, args);
   else if (command === "resume-whatsapp") resumeWhatsApp(argv, args);
@@ -122,6 +124,7 @@ async function init(argv, args) {
       ["whatsapp-web", "WhatsApp Desktop/Web", "Cross-platform sync through a linked WhatsApp Web/Desktop session.", "🌐"],
       ["imessage", "Apple iMessage", "Live local sync from macOS Messages database.", "💬"],
       ["slack", "Slack export", "Import official Slack workspace export ZIP/folder.", "🧵"],
+      ["teams", "Microsoft Teams export", "Import Microsoft Teams export JSON/ZIP/folder.", "🟪"],
       ["linkedin", "LinkedIn archive", "Import official LinkedIn data archive ZIP/folder.", "💼"],
       ["gmail", "Gmail Takeout", "Import official Gmail Takeout .mbox or ZIP.", "📧"],
       ["calendar", "Google Calendar", "Import official Google Calendar .ics export.", "🗓️"],
@@ -306,6 +309,7 @@ async function runRefresh(argv, args) {
     if (selectedSources.includes("whatsapp-web")) console.log(`  sync WhatsApp Desktop/Web: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
     if (selectedSources.includes("imessage")) console.log(`  sync iMessage: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
     if (selectedSources.includes("slack")) console.log("  Slack: import-only; run digital-brain import-slack --input <export.zip>");
+    if (selectedSources.includes("teams")) console.log("  Microsoft Teams: import-only; run digital-brain import-teams --input <export.zip|folder>");
     if (selectedSources.includes("linkedin")) console.log("  LinkedIn: import-only; run digital-brain import-linkedin --input <archive.zip>");
     if (selectedSources.includes("gmail")) console.log("  Gmail: import-only; run digital-brain import-gmail --input <takeout.mbox|takeout.zip>");
     if (selectedSources.includes("calendar")) console.log("  Google Calendar: import-only; run digital-brain import-calendar --input <calendar.ics|takeout.zip>");
@@ -587,6 +591,14 @@ function printSetupCheck(vault, options = {}) {
       hint: "Export guide: https://slack.com/help/articles/201658943-Export-your-workspace-data",
     });
   }
+  if (selectedSources.includes("teams")) {
+    checks.push({
+      label: "Microsoft Teams export",
+      ok: true,
+      value: "import manually",
+      hint: "Use Microsoft Graph/Teams export tools, then run: digital-brain import-teams --input <export.zip|folder>",
+    });
+  }
   if (selectedSources.includes("linkedin")) {
     checks.push({
       label: "LinkedIn archive",
@@ -641,6 +653,9 @@ function printSetupCheck(vault, options = {}) {
     }
     if (selectedSources.includes("slack")) {
       console.log(`  ${step++}. Download a Slack export, then run: digital-brain import-slack --input <export.zip>`);
+    }
+    if (selectedSources.includes("teams")) {
+      console.log(`  ${step++}. Export Teams messages, then run: digital-brain import-teams --input <export.zip|folder>`);
     }
     if (selectedSources.includes("linkedin")) {
       console.log(`  ${step++}. Download a LinkedIn archive, then run: digital-brain import-linkedin --input <archive.zip>`);
@@ -1061,8 +1076,9 @@ function demoTerminalTranscript() {
   B) WhatsApp Desktop/Web
   C) Apple iMessage
   D) Slack export
-  E) LinkedIn archive
-  F) Git repositories
+  E) Microsoft Teams export
+  F) LinkedIn archive
+  G) Git repositories
 
 $ digital-brain run
 Digital Brain refresh: ./Digital Brain Vault
@@ -1099,7 +1115,7 @@ digital-brain demo-proof --out ${outDir}
 
 Your digital footprint should be queryable.
 
-Digital Brain turns WhatsApp, iMessage, Slack, LinkedIn exports, GitHub repos, and notes into local AI memory.
+Digital Brain turns WhatsApp, iMessage, Slack, Microsoft Teams, LinkedIn exports, GitHub repos, and notes into local AI memory.
 
 ## Links
 
@@ -1122,6 +1138,7 @@ Usage:
   digital-brain sync-whatsapp-web --days 30
   digital-brain sync-imessage --days 30
   digital-brain import-slack --input slack-export.zip
+  digital-brain import-teams --input teams-export.zip
   digital-brain import-linkedin --input linkedin-archive.zip
   digital-brain import-gmail --input takeout.mbox
   digital-brain import-calendar --input calendar.ics
@@ -1131,6 +1148,7 @@ Usage:
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]
   digital-brain send-slack --channel C123 --message "Text" [--yes]
+  digital-brain send-teams --chat 19:abc --message "Text" [--yes]
   digital-brain send-imessage --to "+15551234567" --message "Text" [--yes]
   digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|anthropic|xai|codex|codex-app --model llama3.1 [--reply-style-mode match-user|casual-imperfect|clean-formal] [--yes]
   digital-brain pause-whatsapp [--chat "Name"]

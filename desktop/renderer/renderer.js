@@ -16,6 +16,7 @@ const integrations = [
   ["whatsapp-web", "WhatsApp Desktop/Web", "Cross-platform sync through a linked WhatsApp Web/Desktop session.", "Linked device", "ready"],
   ["imessage", "iMessage", "Local macOS Messages import for personal message context.", "macOS only", "ready"],
   ["slack", "Slack", "Import official Slack workspace exports into work and people context.", "Export", "manual"],
+  ["teams", "Microsoft Teams", "Import Teams message exports and draft/send through Microsoft Graph.", "Export/API", "manual"],
   ["linkedin", "LinkedIn", "Import official LinkedIn archives for connections and messages.", "Export", "manual"],
   ["gmail", "Gmail", "Import Gmail Takeout .mbox files into email memory and open loops.", "Takeout", "manual"],
   ["calendar", "Google Calendar", "Import .ics exports for schedule rhythm and recurring people.", "Takeout", "manual"],

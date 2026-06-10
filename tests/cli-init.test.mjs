@@ -582,10 +582,11 @@ test("auto-whatsapp supports keyboard pause controls", () => {
   assert.match(source, /input\.setRawMode\(false\)/);
 });
 
-test("slack and linkedin imports feed relationship memory", () => {
+test("slack teams and linkedin imports feed relationship memory", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
   const slack = path.join(root, "slack-export");
+  const teams = path.join(root, "teams-export");
   const linkedin = path.join(root, "linkedin-archive");
   fs.mkdirSync(path.join(slack, "general"), { recursive: true });
   fs.mkdirSync(path.join(slack, "D1"), { recursive: true });
@@ -601,6 +602,19 @@ test("slack and linkedin imports feed relationship memory", () => {
   fs.writeFileSync(path.join(slack, "D1", "2026-01-01.json"), JSON.stringify([
     { type: "message", user: "U2", text: "Can you review the launch note?", ts: "1767225601.000100" },
   ]));
+  fs.mkdirSync(teams, { recursive: true });
+  fs.writeFileSync(path.join(teams, "messages.json"), JSON.stringify({
+    value: [
+      {
+        id: "m1",
+        createdDateTime: "2026-01-01T00:00:02Z",
+        chatId: "19:teams-chat",
+        chatDisplayName: "Ada Lovelace",
+        from: { user: { id: "aad-1", displayName: "Ada Lovelace", userPrincipalName: "ada@example.com" } },
+        body: { contentType: "html", content: "<p>Teams note: can you check the launch dashboard?</p>" },
+      },
+    ],
+  }));
   fs.mkdirSync(linkedin, { recursive: true });
   fs.writeFileSync(
     path.join(linkedin, "Connections.csv"),
@@ -613,20 +627,23 @@ test("slack and linkedin imports feed relationship memory", () => {
 
   run([cli, "init", vault, "--yes", "--connect-ai=false"], { HOME: testHome(root) });
   run([cli, "import-slack", "--vault", vault, "--input", slack, "--days", "3650"]);
+  run([cli, "import-teams", "--vault", vault, "--input", teams, "--days", "3650"]);
   run([cli, "import-linkedin", "--vault", vault, "--input", linkedin, "--days", "3650"]);
   run([cli, "extract", "--vault", vault, "--days", "3650", "--min-messages", "1"]);
   run([cli, "interpret", "--vault", vault, "--days", "3650"]);
 
   const profiles = readJson(path.join(vault, "08 Sources", "Analysis", "relationship_profiles.json"));
   assert.ok(profiles.some((profile) => profile.sourceSystem === "Slack"));
+  assert.ok(profiles.some((profile) => profile.sourceSystem === "Microsoft Teams"));
   assert.ok(profiles.some((profile) => profile.sourceSystem === "LinkedIn"));
   const people = readJson(path.join(vault, "08 Sources", "Analysis", "person_identity_map.json"));
   const ada = people.find((person) => person.displayName === "Ada Lovelace");
-  assert.deepEqual(ada.sources.sort(), ["LinkedIn", "Slack"]);
-  assert.equal(ada.sourceProfiles.length, 2);
+  assert.deepEqual(ada.sources.sort(), ["LinkedIn", "Microsoft Teams", "Slack"]);
+  assert.equal(ada.sourceProfiles.length, 3);
   assert.match(read(path.join(vault, "06 AI Memory", "Person Context Index.md")), /Ada Lovelace/);
   const replyContext = read(path.join(vault, "06 AI Memory", "Person Reply Context.md"));
   assert.match(replyContext, /Slack \/ D1/);
+  assert.match(replyContext, /Microsoft Teams \/ Ada Lovelace/);
   assert.match(replyContext, /LinkedIn \/ Ada Lovelace/);
   assert.match(read(path.join(vault, "04 People", "LinkedIn Connections.md")), /Ada Lovelace/);
 });
@@ -701,16 +718,18 @@ test("google calendar import writes calendar memory", () => {
   assert.match(memory, /teammate@example.com/);
 });
 
-test("slack and imessage send commands draft by default", () => {
+test("slack teams and imessage send commands draft by default", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
   fs.mkdirSync(vault, { recursive: true });
   fs.writeFileSync(path.join(vault, "digital-brain.config.json"), "{}");
 
   run([cli, "send-slack", "--vault", vault, "--channel", "C123", "--message", "hello"]);
+  run([cli, "send-teams", "--vault", vault, "--chat", "19:abc", "--message", "hello"]);
   run([cli, "send-imessage", "--vault", vault, "--to", "+15551234567", "--message", "hello"]);
 
   assert.match(read(path.join(vault, "08 Sources", "Slack", "Outbound", "Sent.md")), /draft/);
+  assert.match(read(path.join(vault, "08 Sources", "Microsoft Teams", "Outbound", "Sent.md")), /draft/);
   assert.match(read(path.join(vault, "08 Sources", "iMessage", "Outbound", "Sent.md")), /draft/);
 });
 
