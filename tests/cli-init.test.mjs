@@ -334,6 +334,9 @@ test("auto-whatsapp requires an explicit allowlist", () => {
 test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", () => {
   const source = read(path.join(repo, "whatsapp-web", "auto-reply.mjs"));
   assert.match(source, /Default to 1-12 words for casual chats/);
+  assert.match(source, /replyDebounceMs/);
+  assert.match(source, /answer the combined latest intent once/);
+  assert.match(source, /do not pretend you opened or inspected it/);
   assert.match(source, /Do not repeat facts, plans, suggestions, or context/);
   assert.match(source, /Avoid assistant-like niceness and filler/);
   assert.match(source, /btw ai is helping me reply rn/);

@@ -163,6 +163,7 @@ Guardrails:
 - with `--provider codex-app`, requires a Codex desktop bridge automation/thread that writes response files
 - requires `--allow "Name"` or `--contact "+15551234567"` unless `--allow-all` is explicitly passed
 - single-threads reply generation so multiple incoming chats do not trigger overlapping sends
+- debounces live messages per chat, default 4000ms, so message bursts get one combined reply; override with `--reply-debounce-ms <ms>`
 - skips likely business, notification, OTP, and service chats unless `--include-businesses` is passed or the chat is explicitly allowlisted by name or contact number
 - processes unread chats on startup unless `--no-process-unread` is passed
 - skips groups unless `--include-groups` is passed

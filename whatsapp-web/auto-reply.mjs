@@ -41,6 +41,7 @@ const processUnreadOnStart = !Boolean(args["no-process-unread"]);
 const cooldownMinutes = numberArg("cooldown-minutes", 20);
 const maxRepliesPerChat = numberArg("max-replies-per-chat", 0);
 const maxContextChars = numberArg("max-context-chars", 12000);
+const replyDebounceMs = numberArg("reply-debounce-ms", 4000);
 const outboundLogMode = args["log-mode"] || config.outboundLogMode || "metadata";
 const state = loadState();
 const whitelist = loadWhitelist();
@@ -48,6 +49,7 @@ const hasStoredScope = Object.keys(whitelist.allowedChats || {}).length > 0;
 const hasInitialScope = allowAll || allow.length > 0 || contactNumbers.length > 0 || hasStoredScope;
 const interactiveTerminal = Boolean(input.isTTY && output.isTTY);
 let queueTail = Promise.resolve();
+const pendingLiveReplies = new Map();
 const rl = interactiveTerminal ? readline.createInterface({ input, output }) : null;
 
 fs.mkdirSync(outboundDir, { recursive: true });
@@ -89,6 +91,7 @@ client.on("ready", async () => {
   if (provider === "codex-app") console.log(`Codex App bridge: ${codexAppBridgeDir}`);
   if (!includeBusinesses) console.log("Likely business, notification, OTP, and service chats are skipped by default.");
   console.log(maxRepliesPerChat > 0 ? `Reply cap: ${maxRepliesPerChat} per chat per run.` : "Reply cap: unlimited.");
+  console.log(`Live reply debounce: ${replyDebounceMs}ms.`);
   try {
     if (processUnreadOnStart) {
       await processUnreadChats();
@@ -104,7 +107,7 @@ client.on("ready", async () => {
 client.on("message", async (message) => {
   try {
     console.log(`Received WhatsApp message event: ${summarize(message.body || "[non-text message]")}`);
-    enqueueMessage(message);
+    await scheduleLiveMessage(message);
   } catch (error) {
     console.error(`Auto-reply error: ${error.message}`);
   }
@@ -188,6 +191,20 @@ function enqueueMessage(message, knownChat = null) {
     .then(() => handleMessage(message, knownChat))
     .catch((error) => console.error(`Auto-reply error: ${error.message}`));
   return queueTail;
+}
+
+async function scheduleLiveMessage(message) {
+  if (message.fromMe || message.isStatus) return;
+  const chat = await message.getChat();
+  const key = chatKey(chat);
+  const existing = pendingLiveReplies.get(key);
+  if (existing?.timer) clearTimeout(existing.timer);
+  const timer = setTimeout(() => {
+    pendingLiveReplies.delete(key);
+    enqueueMessage(message, chat);
+  }, replyDebounceMs);
+  pendingLiveReplies.set(key, { message, chat, timer });
+  console.log(`Queued debounced reply for ${chatName(chat)} in ${replyDebounceMs}ms.`);
 }
 
 async function ensureChatApproved(chat, recentMessages) {
@@ -302,13 +319,15 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "Be natural, terse, and relationship-appropriate.",
     "Default to 1-12 words for casual chats unless the incoming message clearly requires detail.",
     "First infer the immediate intent of the current conversation from the recent chat. Continue that thread only.",
+    "If the other person sent multiple messages in a row, answer the combined latest intent once.",
     "Do not repeat facts, plans, suggestions, or context that were already stated in the recent chat unless confirming them briefly.",
+    "If the chat includes a URL, do not pretend you opened or inspected it. React only to what the sender said, or ask if the user should check it.",
     "Do not start with hey/hi unless the recent chat itself uses that greeting pattern.",
     "Mirror the vocabulary, register, and pacing already present in this chat.",
     "Match the user's own communication style from My Communication Style. If it says lowercase-heavy or undercapitalized, prefer lowercase casual texting.",
     "Use lexical signals from My Communication Style: recurring style words, openers, short phrase shapes, punctuation habits, and lowercase-i behavior.",
     "Do not overuse bro, lol, haha, emojis, or question marks. Only use them if the recent chat clearly does.",
-    "Avoid assistant-like niceness and filler such as sounds perfect, happy to, sure thing, smooth, quick, no worries, no demon stuff, or let’s unless that exact energy is already in the chat.",
+    "Avoid assistant-like niceness and filler such as sounds perfect, happy to, sure thing, smooth, quick, no worries, no demon stuff, digital prep chef, digital neil, spitting facts, living in the future, or let’s unless that exact energy is already in the chat.",
     "If the recipient asks about AI, answer directly in the user's casual tone and do not overexplain.",
     "Do not sound like customer support, corporate email, or a generic AI assistant.",
     "Use the user's local memory context, but do not reveal private notes or say you read a vault.",
