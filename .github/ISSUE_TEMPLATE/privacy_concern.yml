@@ -1,0 +1,34 @@
+name: Privacy or safety concern
+description: Report a privacy, security, logging, or outbound messaging concern.
+title: "Privacy: "
+labels: ["privacy"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not post secrets, private messages, exploit details, or sensitive screenshots publicly.
+        Keep this report minimal and redacted.
+  - type: textarea
+    id: concern
+    attributes:
+      label: Concern
+      description: What behavior worries you?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Raw data storage
+        - Generated memory
+        - Provider prompts/API use
+        - WhatsApp outbound sending
+        - Logs/telemetry
+        - Install/setup
+        - Other
+  - type: textarea
+    id: expected
+    attributes:
+      label: Safer expected behavior
+      description: What should Digital Brain do instead?

@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a Digital Brain bug with enough context to reproduce.
+title: "Bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste private chats, API keys, vault files, screenshots with names/messages, or local database content.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Digital Brain version
+      placeholder: "digital-brain --version or npm view digital-brain version"
+  - type: dropdown
+    id: source
+    attributes:
+      label: Affected source
+      options:
+        - WhatsApp
+        - iMessage
+        - Slack
+        - LinkedIn
+        - Git repositories
+        - Obsidian/vault output
+        - Auto-reply/outbound
+        - Other
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs
+      description: Paste only redacted terminal output.
+      render: shell

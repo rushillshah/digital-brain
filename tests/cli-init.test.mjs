@@ -197,6 +197,32 @@ test("init can configure xAI auto-reply provider and key", () => {
   assert.equal(config.xaiApiKey, "test-xai-key");
 });
 
+test("init can opt into anonymous telemetry without content", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const home = testHome(root);
+  run([
+    cli,
+    "init",
+    vault,
+    "--yes",
+    "--connect-ai=false",
+    "--telemetry=true",
+    "--sources",
+    "whatsapp,repos",
+  ], { HOME: home, DIGITAL_BRAIN_TELEMETRY_OFFLINE: "1" });
+
+  const config = readJson(path.join(vault, "digital-brain.config.json"));
+  assert.equal(config.telemetryEnabled, true);
+  const telemetry = readJson(path.join(home, ".digital-brain", "telemetry.json"));
+  assert.equal(telemetry.enabled, true);
+  assert.ok(telemetry.installId);
+  const events = read(path.join(home, ".digital-brain", "telemetry-events.jsonl")).trim().split("\n").map((line) => JSON.parse(line));
+  assert.ok(events.some((event) => event.event === "init_completed"));
+  assert.ok(events.some((event) => event.event === "source_selected" && event.source === "whatsapp"));
+  assert.ok(events.every((event) => !event.vault && !event.vaultPath && !event.message && !event.chatName && !event.apiKey));
+});
+
 test("noninteractive auto-send init requires responsibility acceptance", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
@@ -273,6 +299,18 @@ test("sample extractor and interpreter produce relationship memory", () => {
   assert.match(interpreted, /## Typing Style To Match/);
   assert.match(interpreted, /## Reply Guidance/);
   assert.match(interpreted, /Generated draft/);
+});
+
+test("demo-proof writes fake-data launch assets", () => {
+  const root = tempDir();
+  const out = path.join(root, "demo-assets");
+
+  run([cli, "demo-proof", "--out", out]);
+
+  assert.ok(fs.existsSync(path.join(out, "sample-vault", "06 AI Memory", "Person Reply Context.md")));
+  assert.match(read(path.join(out, "terminal-demo.txt")), /npx digital-brain init/);
+  assert.match(read(path.join(out, "screenshot-cards.html")), /Digital Brain turns your digital footprint/);
+  assert.match(read(path.join(out, "README.md")), /npm: https:\/\/www\.npmjs\.com\/package\/digital-brain/);
 });
 
 test("interpreter infers roles from conversation evidence, not just contact names", () => {

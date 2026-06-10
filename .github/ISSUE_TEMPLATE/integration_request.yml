@@ -1,0 +1,29 @@
+name: Integration request
+description: Request a new source, provider, exporter, or destination.
+title: "Integration: "
+labels: ["integration", "help wanted"]
+body:
+  - type: textarea
+    id: source
+    attributes:
+      label: Integration
+      description: What app/source/provider should Digital Brain support?
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: User value
+      description: What context or action should this unlock?
+    validations:
+      required: true
+  - type: textarea
+    id: data_access
+    attributes:
+      label: Data access model
+      description: Official export, local database, API, web automation, or unknown?
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy/safety notes
+      description: Any consent, rate-limit, account, or platform-policy concerns?

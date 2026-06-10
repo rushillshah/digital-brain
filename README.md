@@ -94,6 +94,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 ```bash
 digital-brain init
 digital-brain run
+digital-brain demo-proof --out ./demo-assets
 digital-brain doctor
 digital-brain sync-imessage --days 30
 digital-brain import-slack --input ./slack-export.zip
@@ -123,6 +124,8 @@ Repository context is local-first too. During `init`, choose `Git repositories`,
 You can add repository context later with `digital-brain connect-repos`; it updates the vault config and imports the selected repos. Auto-reply also maintains `06 AI Memory/Conversation Continuity.md` after AI-assisted drafts/sends so future replies know where each conversation was left off.
 
 Use `digital-brain doctor` or `digital-brain tutorial` anytime to see dependency status and next steps.
+
+Use `digital-brain demo-proof --out ./demo-assets` to generate fake-data screenshots, a sample vault, and launch copy for README/social posts. See [docs/GROWTH.md](docs/GROWTH.md).
 
 The lower-level commands still exist for debugging:
 
@@ -226,6 +229,8 @@ This uses fake WhatsApp-style messages in `examples/sample-vault`.
 
 PRs are welcome, but this project is privacy-sensitive. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR, especially if touching imports, generated memory, provider prompts, logs, or outbound messaging.
 
+Growth and contributor tooling is documented in [docs/GROWTH.md](docs/GROWTH.md). Do not fake npm downloads, stars, or installs.
+
 ## Privacy
 
 Digital Brain is local-first. It does not upload messages or notes.
@@ -238,6 +243,8 @@ Slack support reads Slack workspace export JSON. LinkedIn support reads LinkedIn
 
 Relationship labels are working notes, not truth. You can edit them with `relationship_overrides.json`.
 Role inference records evidence snippets from conversation text when available, but labels are still provisional and should be corrected with overrides where wrong.
+
+Anonymous telemetry is off by default and opt-in during setup. Opt-in events are recorded locally and only sent over the network if `DIGITAL_BRAIN_TELEMETRY_URL` is set. Telemetry may include setup success/failure metadata only: event name, version, platform, selected sources, and error step/status. It must never send messages, names, vault paths, API keys, raw exports, or generated memory.
 
 Always-on and outbound modes depend on local app databases, WhatsApp Web, and third-party behavior that can change. You are responsible for consent, privacy, message content, and anything sent from your machine.
 

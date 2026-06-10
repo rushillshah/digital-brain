@@ -6,6 +6,7 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { copyDir, ensureDir, packageRoot, resolveVault, writeDefaultVault } from "../lib/fs.js";
+import { emitTelemetry, readTelemetryPreference, writeTelemetryPreference } from "../lib/telemetry.js";
 
 const root = packageRoot(import.meta.url);
 const CONFIG_SCHEMA_VERSION = 1;
@@ -28,9 +29,10 @@ async function main() {
   const args = parseArgs(argv);
 
   if (command === "init") await init(argv, args);
-  else if (command === "run" || command === "refresh") runRefresh(argv, args);
+  else if (command === "run" || command === "refresh") await runRefresh(argv, args);
   else if (command === "doctor") doctor();
   else if (command === "tutorial" || command === "setup-check") doctor({ tutorial: true });
+  else if (command === "demo-proof") demoProof(argv, args);
   else if (command === "sync-whatsapp") runPython("digital_brain_whatsapp_mac_sync.py", argv);
   else if (command === "sync-imessage") runPython("digital_brain_imessage_sync.py", argv);
   else if (command === "import-slack") runPython("digital_brain_slack_export_import.py", argv);
@@ -73,6 +75,7 @@ async function init(argv, args) {
   let sourceMarkdownMode = args["source-markdown-mode"] || "none";
   let selectedSources = parseList(args.sources || "whatsapp");
   let responsibilityAccepted = toBoolean(args["responsibility-accepted"]) || fullAuto || schedule === "always-on";
+  let telemetryEnabled = toBoolean(args.telemetry);
 
   if (!args.yes) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -157,6 +160,7 @@ async function init(argv, args) {
       ], replyStyleMode);
     }
     connectAi = await confirm(rl, "🔗 Add global AI pointers for Codex/Claude/Gemini?", true);
+    telemetryEnabled = await confirm(rl, "📊 Share anonymous setup/error telemetry?", false);
     responsibilityAccepted = await responsibilityGate(rl, { schedule, outboundMode });
     if (!responsibilityAccepted && needsResponsibilityGate({ schedule, outboundMode })) {
       console.log("Full-auto/outbound confirmation was not accepted. Using manual refresh and draft-only outbound.");
@@ -196,6 +200,7 @@ async function init(argv, args) {
     outboundLogMode: args["outbound-log-mode"] || "metadata",
     setupMode,
     responsibilityAccepted,
+    telemetryEnabled,
     defaults: {
       enterUsesDefault: true,
       defaultVault,
@@ -209,6 +214,7 @@ async function init(argv, args) {
     },
   };
   writeConfig(vault, config);
+  writeTelemetryPreference(telemetryEnabled);
   writeDefaultVault(vault);
   writeRefreshScript(vault, config);
   writeWatchScript(vault, config);
@@ -218,6 +224,20 @@ async function init(argv, args) {
     addGlobalPointer(path.join(os.homedir(), ".codex", "AGENTS.md"), vault, "Codex");
     addGlobalPointer(path.join(os.homedir(), ".claude", "CLAUDE.md"), vault, "Claude");
     addGlobalPointer(path.join(os.homedir(), ".gemini", "GEMINI.md"), vault, "Gemini");
+  }
+  if (telemetryEnabled) {
+    await emitTelemetry("init_started", { mode: setupMode, sources: selectedSources }, { enabled: telemetryEnabled });
+    for (const source of selectedSources) {
+      await emitTelemetry("source_selected", { source }, { enabled: telemetryEnabled });
+    }
+    await emitTelemetry("init_completed", {
+      mode: setupMode,
+      focus: config.focus,
+      schedule,
+      outboundMode,
+      provider: autoReplyProvider,
+      sources: selectedSources,
+    }, { enabled: telemetryEnabled });
   }
 
   console.log(`Digital Brain vault created: ${vault}`);
@@ -257,9 +277,10 @@ function runPython(script, argv) {
   process.exit(result.status ?? 1);
 }
 
-function runRefresh(argv, args) {
+async function runRefresh(argv, args) {
   const vault = getVaultFromArgs(argv);
   const config = readVaultConfig(vault);
+  const telemetryEnabled = readTelemetryPreference(config);
   const days = String(args.days || args["data-window-days"] || config.dataWindowDays || 30);
   const markdownMode = args["markdown-mode"] || config.sourceMarkdownMode || "none";
   const privacyMode = args["privacy-mode"] || config.privacyMode || "standard";
@@ -282,6 +303,7 @@ function runRefresh(argv, args) {
     console.log(`  interpret relationship drafts: days=${days}`);
     return;
   }
+  await emitTelemetry("run_started", { sources: selectedSources, days }, { enabled: telemetryEnabled, vaultConfig: config });
   const steps = [];
   if (selectedSources.includes("whatsapp")) steps.push(["sync WhatsApp", "sync-whatsapp", "digital_brain_whatsapp_mac_sync.py", syncArgs]);
   if (selectedSources.includes("imessage")) steps.push(["sync iMessage", "sync-imessage", "digital_brain_imessage_sync.py", syncArgs]);
@@ -299,8 +321,12 @@ function runRefresh(argv, args) {
     }
     console.log(`\n→ ${label}`);
     const result = runPythonStep(script, stepArgs);
-    if ((result.status ?? 1) !== 0) process.exit(result.status ?? 1);
+    if ((result.status ?? 1) !== 0) {
+      await emitTelemetry("run_failed", { step: skipKey, status: result.status ?? 1 }, { enabled: telemetryEnabled, vaultConfig: config });
+      process.exit(result.status ?? 1);
+    }
   }
+  await emitTelemetry("run_completed", { sources: selectedSources, days }, { enabled: telemetryEnabled, vaultConfig: config });
   console.log("\nDigital Brain refresh complete.");
 }
 
@@ -387,6 +413,26 @@ function whatsappStatus(argv) {
   console.log(`WhatsApp auto-reply: ${state.paused ? "paused" : "running/not globally paused"}`);
   const pausedChats = Object.values(state.pausedChats || {});
   if (pausedChats.length) console.log(`Paused chats: ${pausedChats.map((chat) => chat.chatName).join(", ")}`);
+}
+
+function demoProof(argv, args) {
+  const positional = argv.filter((arg) => !arg.startsWith("--"));
+  const outDir = path.resolve(args.out || positional[0] || "demo-assets");
+  const sampleVault = path.join(outDir, "sample-vault");
+  ensureDir(outDir);
+  if (!fs.existsSync(path.join(sampleVault, "08 Sources"))) {
+    copyDir(path.join(root, "examples", "sample-vault"), sampleVault);
+  }
+  const extract = runPythonStep("digital_brain_relationship_extractor.py", ["--vault", sampleVault, "--days", "365", "--min-messages", "1"]);
+  if ((extract.status ?? 1) !== 0) process.exit(extract.status ?? 1);
+  const interpret = runPythonStep("digital_brain_relationship_interpreter.py", ["--vault", sampleVault, "--days", "365"]);
+  if ((interpret.status ?? 1) !== 0) process.exit(interpret.status ?? 1);
+  writeFileAtomic(path.join(outDir, "terminal-demo.txt"), demoTerminalTranscript());
+  writeFileAtomic(path.join(outDir, "screenshot-cards.html"), demoScreenshotHtml());
+  writeFileAtomic(path.join(outDir, "README.md"), demoReadme(outDir));
+  console.log(`Demo proof assets written to: ${outDir}`);
+  console.log(`Screenshot-ready HTML: ${path.join(outDir, "screenshot-cards.html")}`);
+  console.log(`Sample vault: ${sampleVault}`);
 }
 
 function pauseFile(vault) {
@@ -960,12 +1006,185 @@ function clampInterval(value) {
   return Math.floor(parsed);
 }
 
+function demoTerminalTranscript() {
+  return `$ npx digital-brain init
+◇ Sources to set up
+  A) WhatsApp Mac
+  B) Apple iMessage
+  C) Slack export
+  D) LinkedIn archive
+  E) Git repositories
+
+$ digital-brain run
+Digital Brain refresh: ./Digital Brain Vault
+
+→ sync WhatsApp
+Added sample messages.
+
+→ extract
+Wrote relationship profiles.
+Wrote canonical person records.
+
+→ interpret
+Wrote interpreted notes.
+
+Digital Brain refresh complete.
+`;
+}
+
+function demoScreenshotHtml() {
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Digital Brain Demo Cards</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #101418;
+      color: #f6f3ec;
+    }
+    body {
+      margin: 0;
+      padding: 40px;
+      background: linear-gradient(135deg, #101418 0%, #17211f 55%, #151515 100%);
+    }
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: grid;
+      gap: 24px;
+    }
+    h1 {
+      margin: 0;
+      font-size: 44px;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+    p {
+      color: #c9c3b8;
+      font-size: 18px;
+      line-height: 1.5;
+      margin: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .card {
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      border-radius: 8px;
+      padding: 20px;
+      min-height: 190px;
+    }
+    .label {
+      color: #73e0a9;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 12px;
+    }
+    .title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      color: #d8d2c8;
+      line-height: 1.55;
+    }
+    code {
+      background: rgba(0,0,0,.34);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 6px;
+      display: block;
+      padding: 16px;
+      color: #d9ffe9;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Digital Brain turns your digital footprint into local AI memory.</h1>
+    <p>Messages, repos, notes, and exports become an editable Obsidian-compatible context vault.</p>
+    <div class="grid">
+      <section class="card">
+        <div class="label">People</div>
+        <div class="title">Relationship context</div>
+        <ul>
+          <li>Role evidence from conversation text</li>
+          <li>Typing style and tone</li>
+          <li>Open loops and continuity</li>
+        </ul>
+      </section>
+      <section class="card">
+        <div class="label">Work</div>
+        <div class="title">Project memory</div>
+        <ul>
+          <li>GitHub/repo summaries</li>
+          <li>Slack and LinkedIn imports</li>
+          <li>Local notes in one vault</li>
+        </ul>
+      </section>
+      <section class="card">
+        <div class="label">Action</div>
+        <div class="title">Reply assistance</div>
+        <ul>
+          <li>Draft or auto-reply with allowlists</li>
+          <li>Provider choice: local or API</li>
+          <li>Privacy-first safety defaults</li>
+        </ul>
+      </section>
+    </div>
+    <code>npx digital-brain init<br>digital-brain run</code>
+  </main>
+</body>
+</html>
+`;
+}
+
+function demoReadme(outDir) {
+  return `# Digital Brain Demo Proof Assets
+
+Generated by:
+
+\`\`\`bash
+digital-brain demo-proof --out ${outDir}
+\`\`\`
+
+## Files
+
+- \`sample-vault/\`: fake-data vault for demos and screenshots.
+- \`terminal-demo.txt\`: sanitized terminal transcript.
+- \`screenshot-cards.html\`: screenshot-ready landing/demo cards.
+
+## Suggested Caption
+
+Your digital footprint should be queryable.
+
+Digital Brain turns WhatsApp, iMessage, Slack, LinkedIn exports, GitHub repos, and notes into local AI memory.
+
+## Links
+
+- npm: https://www.npmjs.com/package/digital-brain
+- GitHub: https://github.com/rushillshah/digital-brain
+`;
+}
+
 function help() {
   console.log(`Digital Brain
 
 Usage:
   digital-brain init [vault]
   digital-brain run
+  digital-brain demo-proof --out ./demo-assets
   digital-brain doctor
   digital-brain tutorial
   digital-brain sync-whatsapp --days 30

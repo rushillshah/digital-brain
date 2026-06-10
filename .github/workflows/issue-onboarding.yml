@@ -1,0 +1,55 @@
+name: Issue onboarding
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label and welcome issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const text = `${issue.title}\n${issue.body || ""}`.toLowerCase();
+            const labelDefs = {
+              "good first issue": "7057ff",
+              "privacy": "d73a4a",
+              "integration": "0e8a16",
+              "help wanted": "008672",
+              "bug": "d73a4a",
+              "showcase": "1d76db",
+              "docs": "0075ca",
+            };
+            for (const [name, color] of Object.entries(labelDefs)) {
+              try {
+                await github.rest.issues.getLabel({ ...context.repo, name });
+              } catch {
+                await github.rest.issues.createLabel({ ...context.repo, name, color });
+              }
+            }
+            const labels = new Set();
+            if (/(privacy|security|secret|token|log|telemetry|consent|outbound|send)/.test(text)) labels.add("privacy");
+            if (/(slack|linkedin|imessage|whatsapp|github|repo|integration|provider|source)/.test(text)) labels.add("integration");
+            if (/(bug|error|crash|fails|failure|broken|exception)/.test(text)) labels.add("bug");
+            if (/(docs|readme|guide|tutorial|copy|typo)/.test(text)) labels.add("docs");
+            if (/(showcase|demo|screenshot|video|gif)/.test(text)) labels.add("showcase");
+            if (/(simple|starter|docs|template|example|good first)/.test(text)) labels.add("good first issue");
+            if (labels.size) {
+              await github.rest.issues.addLabels({ ...context.repo, issue_number: issue.number, labels: [...labels] });
+            }
+            const comments = await github.rest.issues.listComments({ ...context.repo, issue_number: issue.number, per_page: 100 });
+            const alreadyWelcomed = comments.data.some(comment => comment.user.type === "Bot" && comment.body.includes("Digital Brain setup quick start"));
+            if (!alreadyWelcomed) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: issue.number,
+                body: `Digital Brain setup quick start:\n\n\`\`\`bash\nnpx digital-brain init\ndigital-brain run\ndigital-brain doctor\n\`\`\`\n\nPlease keep reports redacted: no private chats, names, vault files, API keys, browser sessions, local databases, or screenshots with personal data. For integration requests, include the official export/API/local data access model if known.`
+              });
+            }

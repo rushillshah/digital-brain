@@ -1,0 +1,25 @@
+name: Showcase or demo
+description: Share a demo, fake-data screenshot, workflow, or writeup.
+title: "Showcase: "
+labels: ["showcase"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please use fake or fully redacted data. Do not share private chats, names, API keys, or vault files.
+  - type: textarea
+    id: demo
+    attributes:
+      label: What did you build or try?
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or links
+      description: Fake-data/redacted only.
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Feedback
+      description: What worked, what felt confusing, and what should improve?

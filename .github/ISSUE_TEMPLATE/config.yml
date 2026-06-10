@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: npm package
+    url: https://www.npmjs.com/package/digital-brain
+    about: Install and inspect the published package.
+  - name: GitHub repository
+    url: https://github.com/rushillshah/digital-brain
+    about: Source, README, issues, and discussions.
