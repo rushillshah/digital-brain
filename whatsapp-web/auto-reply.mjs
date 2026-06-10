@@ -20,6 +20,7 @@ const outboundDir = path.join(whatsAppDir, "Outbound");
 const sessionDir = path.join(whatsAppDir, ".session");
 const statePath = path.join(outboundDir, "auto-reply-state.json");
 const whitelistPath = path.join(outboundDir, "auto-reply-whitelist.json");
+const pausePath = path.join(outboundDir, "auto-reply-pause.json");
 const codexAppBridgeDir = path.join(outboundDir, "Codex App Bridge");
 const config = readConfig(vault);
 const provider = args.provider || config.autoReplyProvider || "ollama";
@@ -247,6 +248,11 @@ async function handleMessage(message, knownChat = null) {
   const chat = knownChat || await message.getChat();
   const name = chatName(chat);
   console.log(`Received from ${name}: ${summarize(message.body || "[non-text message]")}`);
+  if (isAutoReplyPaused(chat)) {
+    console.log(`Skipping paused chat: ${name}`);
+    markProcessed(message, name, { sent: false });
+    return;
+  }
   if (chat.isGroup && !includeGroups && !isChatWhitelisted(chat)) {
     console.log(`Skipping group chat: ${name}`);
     return;
@@ -288,7 +294,7 @@ async function handleMessage(message, knownChat = null) {
   });
   console.log(`Generating reply for ${name} with ${provider}${provider === "ollama" ? `:${model}` : ""}...`);
   const startedAt = Date.now();
-  const reply = await generateReply(prompt);
+  const reply = matchPunctuationStyle(await generateReply(prompt), recentMessages);
   console.log(`Generated reply for ${name} in ${Date.now() - startedAt}ms: ${summarize(reply || "[empty reply]")}`);
   const finalReply = disclosure.required && !containsDisclosure(reply)
     ? `btw ai is helping me reply rn. ${reply}`
@@ -331,6 +337,7 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "Primary style source: the user's recent messages in this exact chat. Match their length, casing, bluntness, and punctuation from those examples.",
     "Secondary style source: My Communication Style. Use it only to break ties, not to add extra slang.",
     "Do not perform a persona. Do not intensify the tone beyond the user's examples.",
+    "Avoid polished punctuation. Do not add commas, apostrophes, semicolons, or final periods unless the user's recent examples use them.",
     "Do not force bro, lol, haha, lmao, wild, rn, emojis, or question marks. Use them only if the user's recent examples in this chat use them naturally.",
     "Avoid assistant-like niceness and filler such as sounds perfect, happy to, sure thing, smooth, quick, no worries, no demon stuff, digital prep chef, digital neil, spitting facts, living in the future, or let’s unless that exact energy is already in the chat.",
     "If the recipient asks about AI, answer directly in the user's casual tone and do not overexplain.",
@@ -566,6 +573,20 @@ function cleanReply(value) {
     .slice(0, 1200);
 }
 
+function matchPunctuationStyle(reply, recentMessages) {
+  const examples = recentMessages
+    .filter((item) => item.fromMe && compact(item.body || ""))
+    .map((item) => item.body || "")
+    .join(" ");
+  if (!examples.trim()) return reply;
+  let output = reply;
+  if (!/['’]/.test(examples)) output = output.replace(/['’]/g, "");
+  if (!/;/.test(examples)) output = output.replace(/;/g, "");
+  if (!/\./.test(examples)) output = output.replace(/\.+$/g, "");
+  if (!/,/.test(examples)) output = output.replace(/,/g, "");
+  return output.replace(/\s+/g, " ").trim();
+}
+
 function isAllowed(chatOrName) {
   if (isChatDenied(chatOrName)) return false;
   if (isChatWhitelisted(chatOrName)) return true;
@@ -655,6 +676,26 @@ function isChatWhitelisted(chatOrName) {
 
 function isChatDenied(chatOrName) {
   return chatKeys(chatOrName).some((key) => Boolean(whitelist.deniedChats?.[key]));
+}
+
+function isAutoReplyPaused(chatOrName) {
+  const pause = readPauseState();
+  if (pause.paused) return true;
+  return chatKeys(chatOrName).some((key) => Boolean(pause.pausedChats?.[key]));
+}
+
+function readPauseState() {
+  if (!fs.existsSync(pausePath)) return { schemaVersion: 1, paused: false, pausedChats: {} };
+  try {
+    const pause = JSON.parse(fs.readFileSync(pausePath, "utf8"));
+    return {
+      schemaVersion: 1,
+      paused: Boolean(pause.paused),
+      pausedChats: pause.pausedChats || {},
+    };
+  } catch {
+    return { schemaVersion: 1, paused: false, pausedChats: {} };
+  }
 }
 
 function setWhitelistDecision(chat, decision, source) {

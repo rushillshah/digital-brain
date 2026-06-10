@@ -142,6 +142,18 @@ digital-brain auto-whatsapp --allow "Mom" --provider codex --codex-command "code
 
 `--provider openai` sends the same Digital Brain prompt and relevant vault context to the OpenAI API. Set `OPENAI_API_KEY`, pass `--openai-api-key`, or choose OpenAI during `digital-brain init` and paste the key into the local vault config.
 
+Pause/resume while `auto-whatsapp` is running:
+
+```bash
+digital-brain pause-whatsapp
+digital-brain resume-whatsapp
+digital-brain pause-whatsapp --chat "Mom"
+digital-brain resume-whatsapp --chat "Mom"
+digital-brain whatsapp-status
+```
+
+The running bot checks the pause file before each reply, so these commands do not require restarting the bot.
+
 `--provider codex` runs a local Codex command. If `--codex-command` contains `{promptFile}`, Digital Brain writes the prompt to a temp file and substitutes the path; otherwise it pipes the prompt to stdin.
 
 `--provider codex-app` does not use the Codex CLI. It writes request JSON files to `08 Sources/WhatsApp/Outbound/Codex App Bridge/requests` and waits for response JSON files in `responses`. A Codex desktop automation or live Codex thread must process those request files and write `{"reply":"..."}` to the provided `responsePath`.
@@ -164,6 +176,7 @@ Guardrails:
 - requires `--allow "Name"` or `--contact "+15551234567"` unless `--allow-all` is explicitly passed
 - single-threads reply generation so multiple incoming chats do not trigger overlapping sends
 - debounces live messages per chat, default 12000ms, so message bursts get one combined reply; override with `--reply-debounce-ms <ms>`
+- supports global and per-chat pause with `pause-whatsapp` / `resume-whatsapp`
 - skips likely business, notification, OTP, and service chats unless `--include-businesses` is passed or the chat is explicitly allowlisted by name or contact number
 - processes unread chats on startup unless `--no-process-unread` is passed
 - skips groups unless `--include-groups` is passed

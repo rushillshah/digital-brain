@@ -102,6 +102,8 @@ digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
 OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini --yes
 digital-brain auto-whatsapp --allow-all --provider codex --yes
 digital-brain auto-whatsapp --allow-all --provider codex-app --yes
+digital-brain pause-whatsapp
+digital-brain resume-whatsapp --chat "Name"
 ```
 
 `init` remembers your vault globally, so `run` works from anywhere. `run` syncs the live local sources you selected, extracts relationships, and writes interpreted memory in one command.

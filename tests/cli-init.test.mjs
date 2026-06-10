@@ -341,6 +341,8 @@ test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", ()
   assert.match(source, /Primary style source: the user's recent messages in this exact chat/);
   assert.match(source, /Do not perform a persona/);
   assert.match(source, /Recent examples of the user's own messages in this chat/);
+  assert.match(source, /Avoid polished punctuation/);
+  assert.match(source, /matchPunctuationStyle/);
   assert.match(source, /Do not repeat facts, plans, suggestions, or context/);
   assert.match(source, /Avoid assistant-like niceness and filler/);
   assert.match(source, /btw ai is helping me reply rn/);
@@ -353,6 +355,30 @@ test("auto-reply allows explicitly whitelisted groups by name", () => {
   assert.match(source, /chat\.isGroup && !includeGroups && !isChatWhitelisted\(chat\)/);
   assert.match(source, /function chatKeys/);
   assert.match(source, /`name:\$\{chatName\(chatOrName\)\.toLowerCase\(\)\}`/);
+});
+
+test("pause and resume commands write WhatsApp pause state", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const home = testHome(root);
+  run([cli, "init", vault, "--yes", "--connect-ai=false"], { HOME: home });
+  run([cli, "pause-whatsapp", "--chat", "Mom"], { HOME: home });
+
+  const pausePath = path.join(vault, "08 Sources", "WhatsApp", "Outbound", "auto-reply-pause.json");
+  let pause = readJson(pausePath);
+  assert.equal(Boolean(pause.pausedChats["name:mom"]), true);
+
+  run([cli, "resume-whatsapp", "--chat", "Mom"], { HOME: home });
+  pause = readJson(pausePath);
+  assert.equal(Boolean(pause.pausedChats["name:mom"]), false);
+
+  run([cli, "pause-whatsapp"], { HOME: home });
+  pause = readJson(pausePath);
+  assert.equal(pause.paused, true);
+
+  run([cli, "resume-whatsapp"], { HOME: home });
+  pause = readJson(pausePath);
+  assert.equal(pause.paused, false);
 });
 
 test("slack and linkedin imports feed relationship memory", () => {

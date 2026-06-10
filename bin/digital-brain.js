@@ -31,6 +31,9 @@ async function main() {
   else if (command === "interpret") runPython("digital_brain_relationship_interpreter.py", argv);
   else if (command === "send-whatsapp") runNode("whatsapp-web/send.mjs", argv);
   else if (command === "auto-whatsapp") runNode("whatsapp-web/auto-reply.mjs", argv);
+  else if (command === "pause-whatsapp") pauseWhatsApp(argv, args);
+  else if (command === "resume-whatsapp") resumeWhatsApp(argv, args);
+  else if (command === "whatsapp-status") whatsappStatus(argv);
   else help();
 }
 
@@ -263,6 +266,62 @@ function runPythonStep(script, argv) {
 function runNode(script, argv) {
   const result = spawnSync(process.execPath, [path.join(root, script), ...withVault(argv)], { stdio: "inherit" });
   process.exit(result.status ?? 1);
+}
+
+function pauseWhatsApp(argv, args) {
+  const vault = getVaultFromArgs(argv);
+  const file = pauseFile(vault);
+  ensureDir(path.dirname(file));
+  const state = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { schemaVersion: 1, paused: false, pausedChats: {} };
+  state.schemaVersion = 1;
+  state.pausedChats ||= {};
+  const chat = args.chat || args.name || "";
+  if (chat) {
+    state.pausedChats[`name:${chat.toLowerCase()}`] = {
+      chatName: chat,
+      reason: args.reason || "",
+      updatedAt: new Date().toISOString(),
+    };
+    console.log(`Paused WhatsApp auto-replies for: ${chat}`);
+  } else {
+    state.paused = true;
+    state.reason = args.reason || "";
+    state.updatedAt = new Date().toISOString();
+    console.log("Paused WhatsApp auto-replies globally.");
+  }
+  writeFileAtomic(file, `${JSON.stringify(state, null, 2)}\n`);
+}
+
+function resumeWhatsApp(argv, args) {
+  const vault = getVaultFromArgs(argv);
+  const file = pauseFile(vault);
+  const state = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { schemaVersion: 1, paused: false, pausedChats: {} };
+  state.schemaVersion = 1;
+  state.pausedChats ||= {};
+  const chat = args.chat || args.name || "";
+  if (chat) {
+    delete state.pausedChats[`name:${chat.toLowerCase()}`];
+    console.log(`Resumed WhatsApp auto-replies for: ${chat}`);
+  } else {
+    state.paused = false;
+    state.reason = "";
+    state.updatedAt = new Date().toISOString();
+    console.log("Resumed WhatsApp auto-replies globally.");
+  }
+  writeFileAtomic(file, `${JSON.stringify(state, null, 2)}\n`);
+}
+
+function whatsappStatus(argv) {
+  const vault = getVaultFromArgs(argv);
+  const file = pauseFile(vault);
+  const state = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { paused: false, pausedChats: {} };
+  console.log(`WhatsApp auto-reply: ${state.paused ? "paused" : "running/not globally paused"}`);
+  const pausedChats = Object.values(state.pausedChats || {});
+  if (pausedChats.length) console.log(`Paused chats: ${pausedChats.map((chat) => chat.chatName).join(", ")}`);
+}
+
+function pauseFile(vault) {
+  return path.join(vault, "08 Sources", "WhatsApp", "Outbound", "auto-reply-pause.json");
 }
 
 function withVault(argv) {
@@ -688,5 +747,8 @@ Usage:
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]
   digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|codex|codex-app --model llama3.1 [--yes] [--no-process-unread]
+  digital-brain pause-whatsapp [--chat "Name"]
+  digital-brain resume-whatsapp [--chat "Name"]
+  digital-brain whatsapp-status
 `);
 }
