@@ -336,6 +336,10 @@ test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", ()
   assert.match(source, /Default to 1-12 words for casual chats/);
   assert.match(source, /replyDebounceMs/);
   assert.match(source, /reply-debounce-ms", 12000/);
+  assert.match(source, /latest unanswered inbound chunk/);
+  assert.match(source, /output exactly NO_REPLY/);
+  assert.match(source, /latestUnansweredInbound/);
+  assert.match(source, /isNoReply/);
   assert.match(source, /answer the combined latest intent once/);
   assert.match(source, /do not pretend you opened or inspected it/);
   assert.match(source, /Primary style source: the user's recent messages in this exact chat/);

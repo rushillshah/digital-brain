@@ -298,6 +298,11 @@ async function handleMessage(message, knownChat = null) {
   const startedAt = Date.now();
   const reply = matchPunctuationStyle(await generateReply(prompt), recentMessages);
   console.log(`Generated reply for ${name} in ${Date.now() - startedAt}ms: ${summarize(reply || "[empty reply]")}`);
+  if (isNoReply(reply)) {
+    console.log(`No reply needed for ${name}.`);
+    markProcessed(message, name, { sent: false });
+    return;
+  }
   const finalReply = disclosure.required && !containsDisclosure(reply)
     ? `btw ai is helping me reply rn. ${reply}`
     : reply;
@@ -317,6 +322,7 @@ async function handleMessage(message, knownChat = null) {
 
 function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequired }) {
   const memory = readMemoryContext(chatName);
+  const unansweredInbound = latestUnansweredInbound(recentMessages, incomingBody);
   const selfExamples = recentMessages
     .filter((item) => item.fromMe && compact(item.body || ""))
     .slice(-6)
@@ -331,8 +337,11 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "Write exactly one message to send as the user.",
     "Be natural, terse, and relationship-appropriate.",
     "Default to 1-12 words for casual chats unless the incoming message clearly requires detail.",
-    "First infer the immediate intent of the current conversation from the recent chat. Continue that thread only.",
+    "Your job is to answer the latest unanswered inbound chunk, not to generally comment on the conversation.",
+    "First infer the concrete ask, update, or emotion in that chunk. Reply only to that.",
     "If the other person sent multiple messages in a row, answer the combined latest intent once.",
+    "If there is no concrete reply needed, output exactly NO_REPLY.",
+    "Do not bring in memory context unless it directly helps answer the latest unanswered chunk.",
     "Do not repeat facts, plans, suggestions, or context that were already stated in the recent chat unless confirming them briefly.",
     "If the chat includes a URL, do not pretend you opened or inspected it. React only to what the sender said, or ask if the user should check it.",
     "Do not start with hey/hi unless the recent chat itself uses that greeting pattern.",
@@ -356,6 +365,9 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "Recent chat:",
     transcript,
     "",
+    "Latest unanswered inbound chunk to answer:",
+    unansweredInbound,
+    "",
     "Recent examples of the user's own messages in this chat:",
     selfExamples,
     "",
@@ -363,6 +375,22 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "",
     "Reply:",
   ].join("\n");
+}
+
+function latestUnansweredInbound(recentMessages, incomingBody) {
+  const chunk = [];
+  for (const item of recentMessages.slice().reverse()) {
+    if (item.isStatus) continue;
+    if (item.fromMe) break;
+    const body = compact(item.body || "");
+    if (body) chunk.unshift(`${item.fromMe ? "Me" : "Them"}: ${body}`);
+  }
+  if (chunk.length) return chunk.join("\n");
+  return compact(incomingBody || "") ? `Them: ${compact(incomingBody || "")}` : "No clear unanswered inbound text.";
+}
+
+function isNoReply(reply) {
+  return compact(reply).toUpperCase() === "NO_REPLY";
 }
 
 function readMemoryContext(chatName) {
