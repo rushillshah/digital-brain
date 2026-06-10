@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Digital Brain</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark">DB</div>
+          <div>
+            <div class="brand-title">Digital Brain</div>
+            <div class="brand-subtitle">Local context graph</div>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-item active" data-view="overview">
+            <span class="nav-icon">O</span>
+            Overview
+          </button>
+          <button class="nav-item" data-view="onboarding">
+            <span class="nav-icon">S</span>
+            Onboarding
+          </button>
+          <button class="nav-item" data-view="integrations">
+            <span class="nav-icon">I</span>
+            Integrations
+          </button>
+          <button class="nav-item" data-view="automation">
+            <span class="nav-icon">R</span>
+            Automation
+          </button>
+          <button class="nav-item" data-view="logs">
+            <span class="nav-icon">L</span>
+            Logs
+          </button>
+        </nav>
+        <div class="vault-card">
+          <div class="muted-label">Vault</div>
+          <div id="vaultName" class="vault-name">Not selected</div>
+          <button id="chooseVaultBtn" class="secondary full">Choose vault</button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1 id="viewTitle">Overview</h1>
+            <p id="viewSubtitle">Your life, work, and relationships as a local Obsidian graph.</p>
+          </div>
+          <div class="top-actions">
+            <button id="openObsidianBtn" class="secondary">Open in Obsidian</button>
+            <button id="runRefreshBtn" class="primary">Run refresh</button>
+          </div>
+        </header>
+
+        <section id="overview" class="view active">
+          <div class="hero-panel">
+            <div class="hero-copy">
+              <div class="eyebrow">Local-first memory layer</div>
+              <h2>Your context, mapped into an Obsidian vault.</h2>
+              <p>Connect sources, keep raw data local, and let AI use confirmed summaries instead of starting cold.</p>
+              <div class="hero-actions">
+                <button id="startOnboardingBtn" class="primary">Start setup</button>
+                <button id="doctorBtn" class="secondary">Run setup check</button>
+              </div>
+            </div>
+            <div class="graph-preview" aria-label="Relationship graph preview">
+              <div class="node node-you">You</div>
+              <div class="node node-a">People</div>
+              <div class="node node-b">Work</div>
+              <div class="node node-c">Sources</div>
+              <div class="node node-d">Open loops</div>
+              <svg viewBox="0 0 520 340" preserveAspectRatio="none">
+                <line x1="260" y1="80" x2="150" y2="155"></line>
+                <line x1="260" y1="80" x2="370" y2="155"></line>
+                <line x1="260" y1="80" x2="260" y2="235"></line>
+                <line x1="150" y1="155" x2="260" y2="235"></line>
+                <line x1="370" y1="155" x2="260" y2="235"></line>
+                <line x1="260" y1="235" x2="260" y2="295"></line>
+              </svg>
+            </div>
+          </div>
+
+          <div class="status-grid">
+            <div class="status-tile">
+              <span class="tile-label">Vault status</span>
+              <strong id="vaultStatus">Waiting</strong>
+            </div>
+            <div class="status-tile">
+              <span class="tile-label">Sources</span>
+              <strong id="sourceCount">0 selected</strong>
+            </div>
+            <div class="status-tile">
+              <span class="tile-label">Outbound</span>
+              <strong id="outboundMode">Not configured</strong>
+            </div>
+            <div class="status-tile">
+              <span class="tile-label">Provider</span>
+              <strong id="provider">Not configured</strong>
+            </div>
+          </div>
+        </section>
+
+        <section id="onboarding" class="view">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="eyebrow">Guided setup</div>
+                <h2>Choose what Digital Brain should know.</h2>
+              </div>
+              <button id="initBtn" class="primary">Create vault</button>
+            </div>
+            <div class="setup-grid">
+              <label class="field">
+                <span>Your name</span>
+                <input id="selfNameInput" value="Me">
+              </label>
+              <label class="field">
+                <span>History window</span>
+                <select id="historySelect">
+                  <option value="14">14 days</option>
+                  <option value="30" selected>30 days</option>
+                  <option value="90">90 days</option>
+                  <option value="365">1 year</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Primary focus</span>
+                <select id="focusSelect">
+                  <option value="relationship-memory">Relationship memory</option>
+                  <option value="reply-help">Reply help</option>
+                  <option value="work-context">Work context</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Refresh cadence</span>
+                <select id="scheduleSelect">
+                  <option value="manual">Manual</option>
+                  <option value="every-30-min">Every 30 minutes</option>
+                  <option value="hourly">Hourly</option>
+                  <option value="always-on">Always-on local loop</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Outbound mode</span>
+                <select id="outboundSelect">
+                  <option value="disabled">Disabled</option>
+                  <option value="draft" selected>Draft only</option>
+                  <option value="send-with-confirmation">Send with confirmation</option>
+                  <option value="auto-send">Auto-send while running</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>AI provider</span>
+                <select id="providerSelect">
+                  <option value="ollama">Ollama local</option>
+                  <option value="openai">OpenAI API</option>
+                  <option value="anthropic">Anthropic API</option>
+                  <option value="xai">xAI API</option>
+                  <option value="codex-app">Codex app bridge</option>
+                  <option value="codex">Codex CLI</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section id="integrations" class="view">
+          <div class="integration-grid" id="integrationGrid"></div>
+        </section>
+
+        <section id="automation" class="view">
+          <div class="panel split-panel">
+            <div>
+              <div class="eyebrow">Local loops</div>
+              <h2>Run it when you want, or keep it warm.</h2>
+              <p>Desktop controls call the same CLI engine. Nothing new gets uploaded because it is in a window.</p>
+            </div>
+            <div class="action-stack">
+              <button id="runRefreshBtn2" class="primary full">Run refresh now</button>
+              <button id="doctorBtn2" class="secondary full">Run doctor</button>
+              <button id="openVaultBtn" class="secondary full">Open vault folder</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="logs" class="view">
+          <div class="terminal">
+            <div class="terminal-header">
+              <span>Output</span>
+              <button id="clearLogsBtn" class="ghost">Clear</button>
+            </div>
+            <pre id="logOutput">Ready.</pre>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

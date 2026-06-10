@@ -47,6 +47,15 @@ Digital Brain gives them a structured, local map of:
 npx digital-brain init
 ```
 
+Desktop preview from a cloned repo:
+
+```bash
+npm install
+npm run desktop
+```
+
+The desktop app is an Electron wrapper around the same local CLI engine. It gives you a Mac-style onboarding UI, integration cards, vault controls, setup checks, and Obsidian launch buttons. See [docs/DESKTOP.md](docs/DESKTOP.md).
+
 The installer asks a short setup quiz: setup mode, history window, primary focus, refresh cadence, always-on interval, active time window, outbound mode, and AI adapter setup.
 
 The quiz is mostly multiple choice. Pick with `A/B/C`, `1/2/3`, the exact value, or press Enter to accept the default. If you skip the vault path, Digital Brain creates a new folder in the current directory:
