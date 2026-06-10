@@ -207,7 +207,7 @@ test("extract writes self communication style from outbound messages", () => {
       isGroup: false,
       fromMe: true,
       author: "Me",
-      body: "yeah bro give me 10",
+      body: "yeah bro give me 10?",
     },
     {
       id: "me-2",
@@ -229,10 +229,18 @@ test("extract writes self communication style from outbound messages", () => {
   assert.equal(profile.typingStyle.lowercaseShare, 1);
   assert.match(profile.typingStyle.signature, /lowercase-heavy/);
   assert.deepEqual(profile.typingStyle.slang, ["yeah", "bro", "rn"]);
+  assert.deepEqual(profile.lexicalProfile.commonStyleWords, ["yeah", "bro", "rn"]);
+  assert.ok(profile.lexicalProfile.commonPhrases.includes("yeah bro give"));
+  assert.ok(profile.lexicalProfile.messageOpeners.includes("yeah bro give"));
+  assert.ok(profile.lexicalProfile.contractions.includes("i'll"));
+  assert.ok(profile.lexicalProfile.punctuationHabits.some((habit) => habit.startsWith("question marks")));
+  assert.equal(profile.lexicalProfile.lowercaseIShare, 1);
 
   const memory = read(path.join(vault, "06 AI Memory", "My Communication Style.md"));
   assert.match(memory, /Prefer undercapitalized\/lowercase casual texting/);
-  assert.match(memory, /bro, rn/);
+  assert.match(memory, /Common style words: yeah, bro, rn/);
+  assert.match(memory, /Common phrases:/);
+  assert.match(memory, /The user often types lowercase `i`/);
 });
 
 test("run uses remembered default vault", () => {

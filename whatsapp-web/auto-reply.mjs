@@ -169,6 +169,7 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "Write exactly one message to send as the user.",
     "Be natural, concise, and relationship-appropriate.",
     "Match the user's own communication style from My Communication Style. If it says lowercase-heavy or undercapitalized, prefer lowercase casual texting.",
+    "Use lexical signals from My Communication Style: recurring style words, openers, short phrase shapes, punctuation habits, and lowercase-i behavior.",
     "Do not sound like customer support, corporate email, or a generic AI assistant.",
     "Use the user's local memory context, but do not reveal private notes or say you read a vault.",
     "Do not invent facts, commitments, times, or promises.",

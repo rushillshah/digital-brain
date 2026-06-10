@@ -78,7 +78,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Merge confirmed-looking same-person profiles across sources into a person context index.
 - Infer provisional roles like parent, family group, work collaborator, close personal contact, or unlabeled contact.
 - Extract relationship-specific typing style: casing, message length, punctuation, emoji, and slang.
-- Extract your own outbound communication style so drafts can match your casing, slang, and punctuation.
+- Extract your own outbound communication style so drafts can match your casing, slang, punctuation, lexical patterns, and common phrase shapes.
 - Generate "how to continue this relationship" notes.
 - Generate reply-ready person context that keeps WhatsApp, iMessage, Slack, and LinkedIn evidence separate under the same person.
 - Create AI-readable memory files for future prompts.

@@ -13,6 +13,14 @@ NEGATIVE = {"angry", "annoyed", "upset", "sad", "bad", "hate", "sorry", "fight",
 LOGISTICS = {"when", "where", "time", "today", "tomorrow", "meeting", "call", "send", "sent", "come", "coming", "reach", "book", "plan", "schedule"}
 WORK = {"pr", "repo", "client", "customer", "meeting", "deck", "code", "ship", "product", "founder", "startup", "work", "office", "investor", "sales", "demo", "launch"}
 SLANG = {"lol", "lmao", "haha", "hahaha", "bro", "bruh", "wtf", "omg", "ngl", "idk", "rn", "btw", "bc", "pls", "plz", "ya", "yeah", "yep", "nah", "fuck", "shit"}
+DISCOURSE_MARKERS = {"actually", "basically", "bro", "cool", "like", "literally", "no", "okay", "so", "wait", "yeah"}
+STOPWORDS = {
+    "a", "about", "all", "am", "an", "and", "are", "as", "at", "be", "been", "but", "by", "can", "could", "did", "do", "does",
+    "for", "from", "get", "got", "had", "has", "have", "he", "her", "here", "him", "his", "how", "i", "if", "in", "is", "it",
+    "its", "just", "me", "my", "not", "of", "on", "or", "our", "she", "so", "that", "the", "their", "them", "then", "there",
+    "they", "this", "to", "too", "up", "was", "we", "were", "what", "when", "where", "who", "why", "will", "with", "would",
+    "you", "your",
+}
 
 
 def main():
@@ -256,6 +264,7 @@ def build_self_profile(messages):
         by_source[message.get("sourceSystem") or source_system(message)].append(message)
     dates = [m["_dt"] for m in outbound]
     style = typing_style(outbound)
+    lexical = lexical_profile(outbound)
     return {
         "profileType": "self_communication_style",
         "messageCount": len(outbound),
@@ -270,7 +279,8 @@ def build_self_profile(messages):
             for source, items in sorted(by_source.items())
         },
         "typingStyle": style,
-        "replyGuidance": self_reply_guidance(style),
+        "lexicalProfile": lexical,
+        "replyGuidance": self_reply_guidance(style, lexical),
     }
 
 
@@ -296,6 +306,7 @@ def write_markdown(path, profiles, days):
 def write_self_memory(path, profile, days):
     path.parent.mkdir(parents=True, exist_ok=True)
     style = profile.get("typingStyle", {})
+    lexical = profile.get("lexicalProfile", {})
     lines = [
         "# My Communication Style",
         "",
@@ -313,6 +324,19 @@ def write_self_memory(path, profile, days):
         f"- Exclamations: {style.get('exclamationShare', 0)}",
         f"- Emoji share: {style.get('emojiShare', 0)}",
         f"- Slang: {', '.join(style.get('slang', [])) or 'none'}",
+        "",
+        "## Lexical Profile",
+        "",
+        f"- Vocabulary density: {lexical.get('uniqueTokenShare', 0)} unique-token share",
+        f"- Common style words: {', '.join(lexical.get('commonStyleWords', [])) or 'none'}",
+        f"- Common content words: {', '.join(lexical.get('topContentWords', [])) or 'none'}",
+        f"- Common phrases: {', '.join(lexical.get('commonPhrases', [])) or 'none'}",
+        f"- Common openers: {', '.join(lexical.get('messageOpeners', [])) or 'none'}",
+        f"- Common endings: {', '.join(lexical.get('messageEndings', [])) or 'none'}",
+        f"- Contractions: {', '.join(lexical.get('contractions', [])) or 'none'}",
+        f"- Abbreviations: {', '.join(lexical.get('abbreviations', [])) or 'none'}",
+        f"- Punctuation habits: {', '.join(lexical.get('punctuationHabits', [])) or 'none'}",
+        f"- Lowercase `i` share: {lexical.get('lowercaseIShare', 0)}",
         "",
         "## Reply Guidance",
         "",
@@ -428,6 +452,115 @@ def typing_style(messages):
     }
 
 
+def lexical_profile(messages):
+    bodies = [(m.get("body") or "").strip() for m in messages if (m.get("body") or "").strip()]
+    tokens_by_body = [tokenize_words(body) for body in bodies]
+    tokens = [token for body_tokens in tokens_by_body for token in body_tokens]
+    if not bodies or not tokens:
+        return empty_lexical_profile()
+
+    content_counts = Counter(token for token in tokens if token not in STOPWORDS and not token.isdigit() and len(token) > 1)
+    style_counts = Counter(token for token in tokens if token in SLANG or token in DISCOURSE_MARKERS)
+    bigrams = Counter(ngram for body_tokens in tokens_by_body for ngram in ngrams(body_tokens, 2))
+    trigrams = Counter(ngram for body_tokens in tokens_by_body for ngram in ngrams(body_tokens, 3))
+    openers = Counter(message_opener(body_tokens) for body_tokens in tokens_by_body if body_tokens)
+    endings = Counter(message_ending(body) for body in bodies if message_ending(body))
+    contractions = Counter(token for token in tokens if "'" in token)
+    abbreviations = Counter(token for token in tokens if token in SLANG or (token.isupper() and len(token) <= 5))
+    lowercase_i = sum(1 for body in bodies if re.search(r"(^|[^A-Za-z])i([^A-Za-z]|$)", body))
+    uppercase_i = sum(1 for body in bodies if re.search(r"(^|[^A-Za-z])I([^A-Za-z]|$)", body))
+
+    return {
+        "sampleSize": len(bodies),
+        "tokenCount": len(tokens),
+        "uniqueTokenShare": round(len(set(tokens)) / max(len(tokens), 1), 2),
+        "commonStyleWords": top_keys(style_counts, 12),
+        "topContentWords": top_keys(content_counts, 12),
+        "commonPhrases": top_phrases(bigrams, trigrams),
+        "messageOpeners": top_keys(openers, 8),
+        "messageEndings": top_keys(endings, 8),
+        "contractions": top_keys(contractions, 8),
+        "abbreviations": top_keys(abbreviations, 8),
+        "punctuationHabits": punctuation_habits(bodies),
+        "lowercaseIShare": round(lowercase_i / max(lowercase_i + uppercase_i, 1), 2),
+    }
+
+
+def empty_lexical_profile():
+    return {
+        "sampleSize": 0,
+        "tokenCount": 0,
+        "uniqueTokenShare": 0,
+        "commonStyleWords": [],
+        "topContentWords": [],
+        "commonPhrases": [],
+        "messageOpeners": [],
+        "messageEndings": [],
+        "contractions": [],
+        "abbreviations": [],
+        "punctuationHabits": [],
+        "lowercaseIShare": 0,
+    }
+
+
+def tokenize_words(text):
+    return re.findall(r"[A-Za-z][A-Za-z']*|\d+", text.lower())
+
+
+def ngrams(tokens, size):
+    return [" ".join(tokens[index:index + size]) for index in range(0, max(len(tokens) - size + 1, 0))]
+
+
+def message_opener(tokens):
+    return " ".join(tokens[:min(3, len(tokens))])
+
+
+def message_ending(text):
+    stripped = text.strip()
+    if not stripped:
+        return ""
+    match = re.search(r"([!?.,]+)$", stripped)
+    if match:
+        return match.group(1)
+    words = tokenize_words(stripped)
+    return words[-1] if words else ""
+
+
+def top_keys(counter, limit):
+    return [key for key, _ in counter.most_common(limit)]
+
+
+def top_phrases(bigrams, trigrams):
+    phrases = []
+    for counter in (trigrams, bigrams):
+        for phrase, count in counter.most_common(10):
+            tokens = phrase.split()
+            if count < 2 and len(phrases) >= 3:
+                continue
+            if all(token in STOPWORDS for token in tokens):
+                continue
+            phrases.append(phrase)
+            if len(phrases) >= 8:
+                return phrases
+    return phrases
+
+
+def punctuation_habits(bodies):
+    habits = []
+    checks = [
+        ("no terminal punctuation", lambda body: bool(body) and body[-1].isalnum()),
+        ("question marks", lambda body: "?" in body),
+        ("exclamation marks", lambda body: "!" in body),
+        ("ellipsis", lambda body: "..." in body),
+        ("repeated punctuation", lambda body: bool(re.search(r"[!?.,]{2,}", body))),
+    ]
+    for label, predicate in checks:
+        share = sum(1 for body in bodies if predicate(body)) / max(len(bodies), 1)
+        if share >= 0.2:
+            habits.append(f"{label} ({round(share, 2)})")
+    return habits
+
+
 def typing_style_summary(style):
     slang = ", ".join(style.get("slang", [])) or "none"
     return (
@@ -436,7 +569,8 @@ def typing_style_summary(style):
     )
 
 
-def self_reply_guidance(style):
+def self_reply_guidance(style, lexical=None):
+    lexical = lexical or empty_lexical_profile()
     guidance = []
     signature = style.get("signature") or ""
     if style.get("sampleSize", 0) == 0:
@@ -456,6 +590,17 @@ def self_reply_guidance(style):
     slang = style.get("slang", [])
     if slang:
         guidance.append(f"Known casual words/slang from the user's style: {', '.join(slang)}.")
+    style_words = lexical.get("commonStyleWords", [])
+    phrases = lexical.get("commonPhrases", [])
+    openers = lexical.get("messageOpeners", [])
+    if style_words:
+        guidance.append(f"Prefer the user's recurring style words when natural: {', '.join(style_words[:8])}.")
+    if phrases:
+        guidance.append(f"Reuse short recurring phrase shapes only when they fit: {', '.join(phrases[:5])}.")
+    if openers:
+        guidance.append(f"Common message starts include: {', '.join(openers[:5])}.")
+    if lexical.get("lowercaseIShare", 0) >= 0.45:
+        guidance.append("The user often types lowercase `i`; preserve that in casual replies.")
     return guidance
 
 
