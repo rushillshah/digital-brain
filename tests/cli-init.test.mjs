@@ -32,6 +32,8 @@ test("init writes configured vault files and scripts", () => {
     "08:00-12:00",
     "--outbound-mode",
     "draft",
+    "--reply-style-mode",
+    "casual-imperfect",
     "--connect-ai=false",
   ], { HOME: home });
 
@@ -43,6 +45,7 @@ test("init writes configured vault files and scripts", () => {
   assert.equal(config.refreshIntervalMinutes, 5);
   assert.equal(config.activeWindow, "08:00-12:00");
   assert.equal(config.outboundMode, "draft");
+  assert.equal(config.replyStyleMode, "casual-imperfect");
   assert.equal(config.autoReplyProvider, "ollama");
   assert.deepEqual(config.selectedSources, ["whatsapp"]);
   assert.equal(config.privacyMode, "standard");
@@ -73,6 +76,7 @@ test("init without a vault path creates the default vault in cwd", () => {
   assert.equal(config.defaults.skippedVaultCreates, vault);
   assert.equal(config.schedule, "manual");
   assert.equal(config.outboundMode, "draft");
+  assert.equal(config.replyStyleMode, "match-user");
   assert.equal(config.autoReplyProvider, "ollama");
 });
 
@@ -388,6 +392,11 @@ test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", ()
   assert.match(source, /Do not perform a persona/);
   assert.match(source, /Recent examples of the user's own messages in this chat/);
   assert.match(source, /Avoid polished punctuation/);
+  assert.match(source, /replyStyleMode/);
+  assert.match(source, /Reply style mode: casual imperfect/);
+  assert.match(source, /Reply style mode: clean formal/);
+  assert.match(source, /Reply style mode: match user/);
+  assert.match(source, /clean spelling, normal capitalization, and normal punctuation/);
   assert.match(source, /matchPunctuationStyle/);
   assert.match(source, /readSelfPunctuationStyle/);
   assert.match(source, /prefersPunctuation/);

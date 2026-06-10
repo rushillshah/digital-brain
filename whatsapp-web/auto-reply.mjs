@@ -32,6 +32,7 @@ const codexAppBridgeDir = path.join(outboundDir, "Codex App Bridge");
 const config = readConfig(vault);
 const provider = args.provider || config.autoReplyProvider || "ollama";
 const model = args.model || config.autoReplyModel || defaultModelForProvider(provider);
+const replyStyleMode = args["reply-style-mode"] || config.replyStyleMode || "match-user";
 const codexCommand = args["codex-command"] || process.env.DIGITAL_BRAIN_CODEX_COMMAND || config.codexCommand || "codex exec --skip-git-repo-check";
 const openaiApiKey = args["openai-api-key"] || process.env.OPENAI_API_KEY || config.openaiApiKey || "";
 const anthropicApiKey = args["anthropic-api-key"] || process.env.ANTHROPIC_API_KEY || config.anthropicApiKey || "";
@@ -309,7 +310,7 @@ async function handleMessage(message, knownChat = null) {
   });
   console.log(`Generating reply for ${name} with ${provider}${provider === "ollama" ? `:${model}` : ""}...`);
   const startedAt = Date.now();
-  const reply = matchPunctuationStyle(await generateReply(prompt), recentMessages);
+  const reply = matchPunctuationStyle(await generateReply(prompt), recentMessages, replyStyleMode);
   console.log(`Generated reply for ${name} in ${Date.now() - startedAt}ms: ${summarize(reply || "[empty reply]")}`);
   if (isNoReply(reply)) {
     console.log(`No reply needed for ${name}.`);
@@ -360,8 +361,9 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "Do not start with hey/hi unless the recent chat itself uses that greeting pattern.",
     "Primary style source: the user's recent messages in this exact chat. Match their length, casing, bluntness, and punctuation from those examples.",
     "Secondary style source: My Communication Style. Use it only to break ties, not to add extra slang.",
+    replyStyleInstruction(replyStyleMode),
     "Do not perform a persona. Do not intensify the tone beyond the user's examples.",
-    "Avoid polished punctuation. Do not add commas, apostrophes, semicolons, or final periods unless the user's recent examples use them.",
+    punctuationInstruction(replyStyleMode),
     "Do not force bro, lol, haha, lmao, wild, rn, emojis, or question marks. Use them only if the user's recent examples in this chat use them naturally.",
     "Avoid assistant-like niceness and filler such as sounds perfect, happy to, sure thing, smooth, quick, no worries, no demon stuff, digital prep chef, digital neil, spitting facts, living in the future, or let’s unless that exact energy is already in the chat.",
     "If the recipient asks about AI, answer directly in the user's casual tone and do not overexplain.",
@@ -400,6 +402,23 @@ function latestUnansweredInbound(recentMessages, incomingBody) {
   }
   if (chunk.length) return chunk.join("\n");
   return compact(incomingBody || "") ? `Them: ${compact(incomingBody || "")}` : "No clear unanswered inbound text.";
+}
+
+function replyStyleInstruction(mode) {
+  if (mode === "casual-imperfect") {
+    return "Reply style mode: casual imperfect. Allow light lowercase, shorthand, missing apostrophes, and small natural imperfections when they fit the user's learned style. Do not make the reply hard to read.";
+  }
+  if (mode === "clean-formal") {
+    return "Reply style mode: clean formal. Use clean spelling, normal capitalization, and normal punctuation. Prefer clarity over mimicking typos or shorthand.";
+  }
+  return "Reply style mode: match user. Match the user's learned chat style. Do not add intentional typos unless the user's recent examples naturally show them.";
+}
+
+function punctuationInstruction(mode) {
+  if (mode === "clean-formal") {
+    return "Use normal clean punctuation where it improves readability. Do not overdo punctuation or make the reply sound corporate.";
+  }
+  return "Avoid polished punctuation. Do not add commas, apostrophes, semicolons, or final periods unless the user's recent examples use them.";
 }
 
 function isNoReply(reply) {
@@ -700,7 +719,8 @@ function cleanReply(value) {
     .slice(0, 1200);
 }
 
-function matchPunctuationStyle(reply, recentMessages) {
+function matchPunctuationStyle(reply, recentMessages, mode = "match-user") {
+  if (mode === "clean-formal") return reply.replace(/\s+/g, " ").trim();
   const exampleMessages = recentMessages
     .filter((item) => item.fromMe && compact(item.body || ""))
     .map((item) => item.body || "");

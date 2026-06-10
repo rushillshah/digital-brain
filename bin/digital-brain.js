@@ -65,6 +65,7 @@ async function init(argv, args) {
   let anthropicApiKey = args["anthropic-api-key"] || "";
   let xaiApiKey = args["xai-api-key"] || "";
   let autoReplyModel = args.model || providerSpecificModelArg(args, autoReplyProvider) || defaultModelForProvider(autoReplyProvider);
+  let replyStyleMode = args["reply-style-mode"] || "match-user";
   let privacyMode = args["privacy-mode"] || "standard";
   let sourceMarkdownMode = args["source-markdown-mode"] || "none";
   let selectedSources = parseList(args.sources || "whatsapp");
@@ -144,6 +145,11 @@ async function init(argv, args) {
         if (autoReplyProvider === "anthropic") anthropicApiKey = apiKey;
         if (autoReplyProvider === "xai") xaiApiKey = apiKey;
       }
+      replyStyleMode = await select(rl, "AI reply style", [
+        ["match-user", "Match me", "Use learned chat style; avoid fake typos unless your examples show them.", "🪞"],
+        ["casual-imperfect", "Casual imperfect", "Allow light lowercase, shorthand, and small natural imperfections.", "✍️"],
+        ["clean-formal", "Clean/formal", "Use cleaner spelling, capitalization, and punctuation.", "🧼"],
+      ], replyStyleMode);
     }
     connectAi = await confirm(rl, "🔗 Add global AI pointers for Codex/Claude/Gemini?", true);
     responsibilityAccepted = await responsibilityGate(rl, { schedule, outboundMode });
@@ -174,6 +180,7 @@ async function init(argv, args) {
     outboundMode,
     autoReplyProvider,
     autoReplyModel: providerUsesModel(autoReplyProvider) ? autoReplyModel : undefined,
+    replyStyleMode,
     openaiApiKey: autoReplyProvider === "openai" && openaiApiKey ? openaiApiKey : undefined,
     anthropicApiKey: autoReplyProvider === "anthropic" && anthropicApiKey ? anthropicApiKey : undefined,
     xaiApiKey: autoReplyProvider === "xai" && xaiApiKey ? xaiApiKey : undefined,
@@ -802,7 +809,7 @@ Usage:
   digital-brain extract --days 30
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]
-  digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|anthropic|xai|codex|codex-app --model llama3.1 [--yes] [--no-process-unread]
+  digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|anthropic|xai|codex|codex-app --model llama3.1 [--reply-style-mode match-user|casual-imperfect|clean-formal] [--yes]
   digital-brain pause-whatsapp [--chat "Name"]
   digital-brain resume-whatsapp [--chat "Name"]
   digital-brain whatsapp-status

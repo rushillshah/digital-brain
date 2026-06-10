@@ -32,6 +32,7 @@ digital-brain run
 - active time window
 - WhatsApp outbound mode
 - WhatsApp auto-reply provider: Ollama, OpenAI API, Anthropic API, xAI API, Codex app bridge, or Codex CLI
+- AI reply style: match learned style, casual imperfect, or clean/formal
 - whether to add AI adapter pointers
 
 Most questions are multiple choice. Pick with `A/B/C`, `1/2/3`, the exact value, or press Enter to use the displayed default.
@@ -138,6 +139,7 @@ Provider options:
 
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --provider ollama --model llama3.1 --yes
+digital-brain auto-whatsapp --allow "Mom" --reply-style-mode casual-imperfect --yes
 OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow "Mom" --provider openai --model gpt-4.1-mini --yes
 ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow "Mom" --provider anthropic --yes
 XAI_API_KEY="xai-..." digital-brain auto-whatsapp --allow "Mom" --provider xai --yes
@@ -151,6 +153,8 @@ digital-brain auto-whatsapp --allow "Mom" --provider codex --codex-command "code
 `--provider anthropic` uses Anthropic's Messages API with default model `claude-sonnet-4-6`. Set `ANTHROPIC_API_KEY`, pass `--anthropic-api-key`, or choose Anthropic during `digital-brain init` and paste the key into the local vault config.
 
 `--provider xai` uses xAI's OpenAI-compatible Responses API with default model `grok-4.3`. Set `XAI_API_KEY`, pass `--xai-api-key`, or choose xAI during `digital-brain init` and paste the key into the local vault config.
+
+`--reply-style-mode` supports `match-user`, `casual-imperfect`, and `clean-formal`. `match-user` is the default. `casual-imperfect` allows light lowercase, shorthand, missing apostrophes, and small natural imperfections when they fit the learned style. `clean-formal` prioritizes cleaner spelling, capitalization, and punctuation.
 
 Pause/resume while `auto-whatsapp` is running:
 
@@ -185,6 +189,7 @@ Guardrails:
 - with `--provider xai`, requires `XAI_API_KEY`, `--xai-api-key`, or `xaiApiKey` in the vault config
 - with `--provider codex`, requires a working local Codex command
 - with `--provider codex-app`, requires a Codex desktop bridge automation/thread that writes response files
+- with `--reply-style-mode`, stores the same preference from init in `digital-brain.config.json`
 - requires `--allow "Name"` or `--contact "+15551234567"` unless `--allow-all` is explicitly passed
 - single-threads reply generation so multiple incoming chats do not trigger overlapping sends
 - debounces live messages per chat, default 12000ms, so message bursts get one combined reply; override with `--reply-debounce-ms <ms>`

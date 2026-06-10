@@ -85,6 +85,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Draft WhatsApp sends by default, send with explicit `--yes`, or configure auto-send mode during init.
 - Run an explicit WhatsApp auto-responder that uses Ollama, OpenAI, Anthropic, xAI, or Codex plus vault memory while the command is running.
 - Choose the WhatsApp auto-reply provider during init: Ollama, OpenAI API, Anthropic API, xAI API, Codex app bridge, or Codex CLI.
+- Choose reply style during init: match your learned chat style, allow light casual imperfections, or keep replies clean/formal.
 - Enforce an AI-disclosure guard after repeated AI-assisted sends.
 
 ## Core Commands
@@ -133,6 +134,7 @@ The auto-responder is opt-in and runs only while the command is active. On start
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes --no-process-unread
+digital-brain auto-whatsapp --allow "Mom" --reply-style-mode casual-imperfect --yes
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1 --yes
 OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini --yes
 ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow-all --provider anthropic --yes
@@ -146,6 +148,8 @@ If you start without `--allow`, `--contact`, or `--allow-all` in an interactive 
 Even with `--allow-all`, likely business, notification, OTP, delivery, bank, and support chats are skipped by default. Use explicit `--allow "Name"` or `--contact "+15551234567"` for trusted personal chats. Pass `--include-businesses` only if you intentionally want those chats included.
 
 The default provider is local Ollama. `--provider openai`, `--provider anthropic`, and `--provider xai` use hosted APIs with the same vault context prompt. Defaults are `gpt-4.1-mini`, `claude-sonnet-4-6`, and `grok-4.3`. `--provider codex` uses the Codex CLI. `--provider codex-app` uses a file bridge for the Codex desktop app.
+
+`--reply-style-mode` controls how polished the AI replies should be. Use `match-user` to follow learned chat style, `casual-imperfect` to allow light lowercase/shorthand/small natural imperfections, or `clean-formal` for cleaner spelling and punctuation.
 
 ```bash
 OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini --yes
