@@ -348,6 +348,13 @@ test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", ()
   assert.match(source, /temperature: 0.25/);
 });
 
+test("auto-reply allows explicitly whitelisted groups by name", () => {
+  const source = read(path.join(repo, "whatsapp-web", "auto-reply.mjs"));
+  assert.match(source, /chat\.isGroup && !includeGroups && !isChatWhitelisted\(chat\)/);
+  assert.match(source, /function chatKeys/);
+  assert.match(source, /`name:\$\{chatName\(chatOrName\)\.toLowerCase\(\)\}`/);
+});
+
 test("slack and linkedin imports feed relationship memory", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");

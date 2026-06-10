@@ -121,7 +121,7 @@ async function processUnreadChats() {
   console.log(`Startup unread scan: ${unreadChats.length} unread chat(s).`);
   for (const chat of unreadChats) {
     const name = chatName(chat);
-    if (chat.isGroup && !includeGroups) {
+    if (chat.isGroup && !includeGroups && !isChatWhitelisted(chat)) {
       console.log(`Skipping unread group chat: ${name}`);
       continue;
     }
@@ -247,7 +247,7 @@ async function handleMessage(message, knownChat = null) {
   const chat = knownChat || await message.getChat();
   const name = chatName(chat);
   console.log(`Received from ${name}: ${summarize(message.body || "[non-text message]")}`);
-  if (chat.isGroup && !includeGroups) {
+  if (chat.isGroup && !includeGroups && !isChatWhitelisted(chat)) {
     console.log(`Skipping group chat: ${name}`);
     return;
   }
@@ -650,11 +650,11 @@ function allowlistSummary() {
 }
 
 function isChatWhitelisted(chatOrName) {
-  return Boolean(whitelist.allowedChats?.[chatKey(chatOrName)]);
+  return chatKeys(chatOrName).some((key) => Boolean(whitelist.allowedChats?.[key]));
 }
 
 function isChatDenied(chatOrName) {
-  return Boolean(whitelist.deniedChats?.[chatKey(chatOrName)]);
+  return chatKeys(chatOrName).some((key) => Boolean(whitelist.deniedChats?.[key]));
 }
 
 function setWhitelistDecision(chat, decision, source) {
@@ -676,8 +676,15 @@ function setWhitelistDecision(chat, decision, source) {
 }
 
 function chatKey(chatOrName) {
-  if (typeof chatOrName === "string") return `name:${chatOrName.toLowerCase()}`;
-  return chatOrName.id?._serialized || `name:${chatName(chatOrName).toLowerCase()}`;
+  return chatKeys(chatOrName)[0];
+}
+
+function chatKeys(chatOrName) {
+  if (typeof chatOrName === "string") return [`name:${chatOrName.toLowerCase()}`];
+  return [
+    chatOrName.id?._serialized,
+    `name:${chatName(chatOrName).toLowerCase()}`,
+  ].filter(Boolean);
 }
 
 function loadWhitelist() {
