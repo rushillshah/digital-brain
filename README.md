@@ -6,19 +6,19 @@ Digital Brain turns your local notes and message history into an editable memory
 
 It is not a chatbot. It is not a cloud memory service. It is the local context layer that makes your existing AI tools feel less generic.
 
-![Digital Brain demo](docs/assets/digital-brain-demo.gif)
+![Digital Brain Obsidian demo](docs/assets/digital-brain-demo.gif)
 
 ## Demo
 
-Digital Brain turns your digital footprint into local AI memory.
+Digital Brain writes a real Obsidian-compatible vault. These screenshots are from a fake-data demo vault opened in Obsidian.
 
-| Life graph | Person memory |
+| Obsidian overview | Person memory |
 | --- | --- |
-| ![Digital Brain life context graph](docs/assets/life-graph.png) | ![Digital Brain person reply context](docs/assets/person-context.png) |
+| ![Digital Brain Obsidian overview](docs/assets/obsidian-overview.png) | ![Digital Brain Obsidian person context](docs/assets/obsidian-person-context.png) |
 
-| Install flow | Relationship evidence |
+| Life graph | Conversation continuity |
 | --- | --- |
-| ![Digital Brain terminal demo](docs/assets/terminal-demo.png) | ![Digital Brain relationship evidence](docs/assets/relationship-evidence.png) |
+| ![Digital Brain Obsidian life graph](docs/assets/obsidian-life-graph.png) | ![Digital Brain Obsidian continuity memory](docs/assets/obsidian-context.png) |
 
 ## Why
 
@@ -148,7 +148,7 @@ You can add repository context later with `digital-brain connect-repos`; it upda
 
 Use `digital-brain doctor` or `digital-brain tutorial` anytime to see dependency status and next steps.
 
-Use `digital-brain demo-proof --out ./demo-assets` to generate fake-data screenshots, a sample vault, and launch copy for README/social posts. See [docs/GROWTH.md](docs/GROWTH.md).
+Use `digital-brain demo-proof --out ./demo-assets` to generate a fake-data sample vault and launch copy for README/social posts. See [docs/GROWTH.md](docs/GROWTH.md).
 
 The lower-level commands still exist for debugging:
 

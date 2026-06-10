@@ -436,10 +436,8 @@ function demoProof(argv, args) {
   const interpret = runPythonStep("digital_brain_relationship_interpreter.py", ["--vault", sampleVault, "--days", "365"]);
   if ((interpret.status ?? 1) !== 0) process.exit(interpret.status ?? 1);
   writeFileAtomic(path.join(outDir, "terminal-demo.txt"), demoTerminalTranscript());
-  writeFileAtomic(path.join(outDir, "screenshot-cards.html"), demoScreenshotHtml());
   writeFileAtomic(path.join(outDir, "README.md"), demoReadme(outDir));
   console.log(`Demo proof assets written to: ${outDir}`);
-  console.log(`Screenshot-ready HTML: ${path.join(outDir, "screenshot-cards.html")}`);
   console.log(`Sample vault: ${sampleVault}`);
 }
 
@@ -1062,124 +1060,6 @@ Digital Brain refresh complete.
 `;
 }
 
-function demoScreenshotHtml() {
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Digital Brain Demo Cards</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #101418;
-      color: #f6f3ec;
-    }
-    body {
-      margin: 0;
-      padding: 40px;
-      background: linear-gradient(135deg, #101418 0%, #17211f 55%, #151515 100%);
-    }
-    main {
-      max-width: 1120px;
-      margin: 0 auto;
-      display: grid;
-      gap: 24px;
-    }
-    h1 {
-      margin: 0;
-      font-size: 44px;
-      line-height: 1.05;
-      letter-spacing: 0;
-    }
-    p {
-      color: #c9c3b8;
-      font-size: 18px;
-      line-height: 1.5;
-      margin: 0;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 16px;
-    }
-    .card {
-      border: 1px solid rgba(255,255,255,.14);
-      background: rgba(255,255,255,.06);
-      border-radius: 8px;
-      padding: 20px;
-      min-height: 190px;
-    }
-    .label {
-      color: #73e0a9;
-      font-size: 13px;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      margin-bottom: 12px;
-    }
-    .title {
-      font-size: 22px;
-      font-weight: 700;
-      margin-bottom: 12px;
-    }
-    ul {
-      margin: 0;
-      padding-left: 18px;
-      color: #d8d2c8;
-      line-height: 1.55;
-    }
-    code {
-      background: rgba(0,0,0,.34);
-      border: 1px solid rgba(255,255,255,.12);
-      border-radius: 6px;
-      display: block;
-      padding: 16px;
-      color: #d9ffe9;
-      font-size: 16px;
-    }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Digital Brain turns your digital footprint into local AI memory.</h1>
-    <p>Messages, repos, notes, and exports become an editable Obsidian-compatible context vault.</p>
-    <div class="grid">
-      <section class="card">
-        <div class="label">People</div>
-        <div class="title">Relationship context</div>
-        <ul>
-          <li>Role evidence from conversation text</li>
-          <li>Typing style and tone</li>
-          <li>Open loops and continuity</li>
-        </ul>
-      </section>
-      <section class="card">
-        <div class="label">Work</div>
-        <div class="title">Project memory</div>
-        <ul>
-          <li>GitHub/repo summaries</li>
-          <li>Slack and LinkedIn imports</li>
-          <li>Local notes in one vault</li>
-        </ul>
-      </section>
-      <section class="card">
-        <div class="label">Action</div>
-        <div class="title">Reply assistance</div>
-        <ul>
-          <li>Draft or auto-reply with allowlists</li>
-          <li>Provider choice: local or API</li>
-          <li>Privacy-first safety defaults</li>
-        </ul>
-      </section>
-    </div>
-    <code>npx digital-brain init<br>digital-brain run</code>
-  </main>
-</body>
-</html>
-`;
-}
-
 function demoReadme(outDir) {
   return `# Digital Brain Demo Proof Assets
 
@@ -1191,9 +1071,8 @@ digital-brain demo-proof --out ${outDir}
 
 ## Files
 
-- \`sample-vault/\`: fake-data vault for demos and screenshots.
+- \`sample-vault/\`: fake-data vault for demos and real Obsidian screenshots.
 - \`terminal-demo.txt\`: sanitized terminal transcript.
-- \`screenshot-cards.html\`: screenshot-ready landing/demo cards.
 
 ## Suggested Caption
 

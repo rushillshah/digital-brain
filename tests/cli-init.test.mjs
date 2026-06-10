@@ -309,7 +309,7 @@ test("demo-proof writes fake-data launch assets", () => {
 
   assert.ok(fs.existsSync(path.join(out, "sample-vault", "06 AI Memory", "Person Reply Context.md")));
   assert.match(read(path.join(out, "terminal-demo.txt")), /npx digital-brain init/);
-  assert.match(read(path.join(out, "screenshot-cards.html")), /Digital Brain turns your digital footprint/);
+  assert.match(read(path.join(out, "README.md")), /real Obsidian screenshots/);
   assert.match(read(path.join(out, "README.md")), /npm: https:\/\/www\.npmjs\.com\/package\/digital-brain/);
 });
 

@@ -12,9 +12,8 @@ digital-brain demo-proof --out ./demo-assets
 
 This writes:
 
-- `sample-vault/`: fake-data vault for screenshots.
+- `sample-vault/`: fake-data vault that can be opened in Obsidian for real product screenshots.
 - `terminal-demo.txt`: sanitized terminal transcript.
-- `screenshot-cards.html`: screenshot-ready cards for README, X, LinkedIn, Reddit, or Product Hunt.
 - `README.md`: launch copy and links.
 
 Use fake data only. Blur or avoid names, message text, API keys, browser sessions, and private vault paths.
@@ -80,6 +79,6 @@ Local event copies are written to:
 
 1. GitHub README with demo assets.
 2. npm package install CTA.
-3. Reddit posts with fake-data screenshots.
+3. Reddit posts with fake-data Obsidian screenshots.
 4. LinkedIn/X posts with a short demo video.
 5. Product Hunt later, after setup and demos are smooth.
