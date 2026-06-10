@@ -179,6 +179,16 @@ test("tutorial prints setup guidance", () => {
   assert.match(result.stdout, /digital-brain init/);
 });
 
+test("auto-whatsapp requires an explicit allowlist", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  run([cli, "init", vault, "--yes", "--connect-ai=false"], { HOME: testHome(root) });
+  const result = runRaw([cli, "auto-whatsapp", "--vault", vault], { HOME: testHome(root) });
+
+  assert.notEqual(result.status, 0);
+  assert.match(`${result.stdout}\n${result.stderr}`, /Refusing to auto-reply without an allowlist/);
+});
+
 test("slack and linkedin imports feed relationship memory", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");

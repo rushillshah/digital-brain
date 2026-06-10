@@ -93,6 +93,33 @@ For 24/7 local polling, run:
 
 The generated script loops forever and sleeps for `refreshIntervalMinutes`. The minimum supported interval is 1 minute. A practical default is 5 minutes.
 
+## WhatsApp Auto-Reply
+
+`digital-brain auto-whatsapp` is separate from refresh automation. It uses WhatsApp Web for live incoming messages and Ollama for local reply generation.
+
+Draft-only:
+
+```bash
+digital-brain auto-whatsapp --allow "Mom" --model llama3.1
+```
+
+Auto-send while the command is running:
+
+```bash
+digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
+```
+
+Guardrails:
+
+- requires Ollama running locally
+- requires the selected model, for example `ollama pull llama3.1`
+- requires `--allow "Name"` unless `--allow-all` is explicitly passed
+- skips groups unless `--include-groups` is passed
+- uses a per-chat cooldown, default 20 minutes
+- caps replies per chat per run, default 5
+- logs metadata by default, not full sent text
+- still enforces the AI disclosure rule after repeated AI-assisted sends
+
 ## Local Cron
 
 Run every 30 minutes from 8-12:

@@ -30,6 +30,7 @@ async function main() {
   else if (command === "extract") runPython("digital_brain_relationship_extractor.py", argv);
   else if (command === "interpret") runPython("digital_brain_relationship_interpreter.py", argv);
   else if (command === "send-whatsapp") runNode("whatsapp-web/send.mjs", argv);
+  else if (command === "auto-whatsapp") runNode("whatsapp-web/auto-reply.mjs", argv);
   else help();
 }
 
@@ -583,5 +584,6 @@ Usage:
   digital-brain extract --days 30
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]
+  digital-brain auto-whatsapp --allow "Name" --model llama3.1 [--yes]
 `);
 }

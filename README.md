@@ -82,6 +82,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Generate reply-ready person context that keeps WhatsApp, iMessage, Slack, and LinkedIn evidence separate under the same person.
 - Create AI-readable memory files for future prompts.
 - Draft WhatsApp sends by default, and only send with explicit `--yes`.
+- Run an explicit WhatsApp auto-responder that uses local Ollama plus vault memory while the command is running.
 - Enforce an AI-disclosure guard after repeated AI-assisted sends.
 
 ## Core Commands
@@ -94,6 +95,7 @@ digital-brain sync-imessage --days 30
 digital-brain import-slack --input ./slack-export.zip
 digital-brain import-linkedin --input ./linkedin-archive.zip
 digital-brain send-whatsapp --to "Name" --message "text"
+digital-brain auto-whatsapp --allow "Name" --model llama3.1
 ```
 
 `init` remembers your vault globally, so `run` works from anywhere. `run` syncs the live local sources you selected, extracts relationships, and writes interpreted memory in one command.
@@ -112,6 +114,13 @@ digital-brain interpret
 ```
 
 The sender drafts by default. Add `--yes` to actually send.
+
+The auto-responder is opt-in and runs only while the command is active. It requires an allowlist unless you explicitly pass `--allow-all`. Without `--yes`, it only logs drafts:
+
+```bash
+digital-brain auto-whatsapp --allow "Mom" --model llama3.1
+digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
+```
 
 If Digital Brain has already sent two AI-assisted messages to the same chat in the last 24 hours, the next send must disclose that AI is helping unless you explicitly bypass the check.
 
