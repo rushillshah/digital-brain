@@ -343,6 +343,8 @@ test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", ()
   assert.match(source, /Recent examples of the user's own messages in this chat/);
   assert.match(source, /Avoid polished punctuation/);
   assert.match(source, /matchPunctuationStyle/);
+  assert.match(source, /readSelfPunctuationStyle/);
+  assert.match(source, /prefersPunctuation/);
   assert.match(source, /Do not repeat facts, plans, suggestions, or context/);
   assert.match(source, /Avoid assistant-like niceness and filler/);
   assert.match(source, /btw ai is helping me reply rn/);
@@ -379,6 +381,14 @@ test("pause and resume commands write WhatsApp pause state", () => {
   run([cli, "resume-whatsapp"], { HOME: home });
   pause = readJson(pausePath);
   assert.equal(pause.paused, false);
+});
+
+test("auto-whatsapp supports keyboard pause controls", () => {
+  const source = read(path.join(repo, "whatsapp-web", "auto-reply.mjs"));
+  assert.match(source, /Keyboard controls: Space toggles pause\/resume/);
+  assert.match(source, /toggleGlobalPause/);
+  assert.match(source, /value === " "/);
+  assert.match(source, /input\.setRawMode\(false\)/);
 });
 
 test("slack and linkedin imports feed relationship memory", () => {

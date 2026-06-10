@@ -106,6 +106,8 @@ digital-brain pause-whatsapp
 digital-brain resume-whatsapp --chat "Name"
 ```
 
+While `auto-whatsapp` is running in a focused terminal, press `Space` to pause/resume globally.
+
 `init` remembers your vault globally, so `run` works from anywhere. `run` syncs the live local sources you selected, extracts relationships, and writes interpreted memory in one command.
 
 Slack and LinkedIn are import-based. Digital Brain reads official export archives; it does not scrape LinkedIn or automate private app UIs. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).

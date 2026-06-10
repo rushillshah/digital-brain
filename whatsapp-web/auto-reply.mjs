@@ -52,6 +52,7 @@ const interactiveTerminal = Boolean(input.isTTY && output.isTTY);
 let queueTail = Promise.resolve();
 const pendingLiveReplies = new Map();
 const rl = interactiveTerminal ? readline.createInterface({ input, output }) : null;
+let keyboardControlsStarted = false;
 
 fs.mkdirSync(outboundDir, { recursive: true });
 
@@ -93,6 +94,7 @@ client.on("ready", async () => {
   if (!includeBusinesses) console.log("Likely business, notification, OTP, and service chats are skipped by default.");
   console.log(maxRepliesPerChat > 0 ? `Reply cap: ${maxRepliesPerChat} per chat per run.` : "Reply cap: unlimited.");
   console.log(`Live reply debounce: ${replyDebounceMs}ms.`);
+  startKeyboardControls();
   try {
     if (processUnreadOnStart) {
       await processUnreadChats();
@@ -574,17 +576,55 @@ function cleanReply(value) {
 }
 
 function matchPunctuationStyle(reply, recentMessages) {
-  const examples = recentMessages
+  const exampleMessages = recentMessages
     .filter((item) => item.fromMe && compact(item.body || ""))
-    .map((item) => item.body || "")
-    .join(" ");
-  if (!examples.trim()) return reply;
+    .map((item) => item.body || "");
+  const local = punctuationProfile(exampleMessages);
+  const global = readSelfPunctuationStyle();
   let output = reply;
-  if (!/['’]/.test(examples)) output = output.replace(/['’]/g, "");
-  if (!/;/.test(examples)) output = output.replace(/;/g, "");
-  if (!/\./.test(examples)) output = output.replace(/\.+$/g, "");
-  if (!/,/.test(examples)) output = output.replace(/,/g, "");
+  if (!prefersPunctuation(local, global, "apostrophe")) output = output.replace(/['’]/g, "");
+  if (!prefersPunctuation(local, global, "semicolon")) output = output.replace(/;/g, "");
+  if (!prefersPunctuation(local, global, "period")) output = output.replace(/\.+$/g, "");
+  if (!prefersPunctuation(local, global, "comma")) output = output.replace(/,/g, "");
   return output.replace(/\s+/g, " ").trim();
+}
+
+function punctuationProfile(messages) {
+  const text = messages.join(" ");
+  const chars = text.length;
+  const count = (pattern) => (text.match(pattern) || []).length;
+  return {
+    hasLocalEvidence: messages.length >= 3 || chars >= 80,
+    apostropheRate: chars ? count(/['’]/g) / chars : 0,
+    commaRate: chars ? count(/,/g) / chars : 0,
+    semicolonRate: chars ? count(/;/g) / chars : 0,
+    periodRate: chars ? count(/\./g) / chars : 0,
+  };
+}
+
+function prefersPunctuation(local, global, kind) {
+  const field = `${kind}Rate`;
+  if (local.hasLocalEvidence) return local[field] > 0.001;
+  if (kind === "period" && global.noTerminalPunctuationShare >= 0.7) return false;
+  return global[field] > 0.001;
+}
+
+function readSelfPunctuationStyle() {
+  const profilePath = path.join(vault, "08 Sources", "Analysis", "self_profile.json");
+  if (!fs.existsSync(profilePath)) return {};
+  const profile = parseJsonLine(fs.readFileSync(profilePath, "utf8")) || {};
+  const habits = profile.lexicalProfile?.punctuationHabits || [];
+  const noTerminal = habits
+    .map((habit) => String(habit).match(/no terminal punctuation \(([\d.]+)\)/))
+    .find(Boolean);
+  const contractions = profile.lexicalProfile?.contractions || [];
+  return {
+    apostropheRate: contractions.length ? 0.01 : 0,
+    commaRate: 0,
+    semicolonRate: 0,
+    periodRate: noTerminal && Number(noTerminal[1]) >= 0.7 ? 0 : 0.01,
+    noTerminalPunctuationShare: noTerminal ? Number(noTerminal[1]) : 0,
+  };
 }
 
 function isAllowed(chatOrName) {
@@ -696,6 +736,40 @@ function readPauseState() {
   } catch {
     return { schemaVersion: 1, paused: false, pausedChats: {} };
   }
+}
+
+function writePauseState(pause) {
+  writeJsonAtomic(pausePath, {
+    schemaVersion: 1,
+    paused: Boolean(pause.paused),
+    reason: pause.reason || "",
+    updatedAt: new Date().toISOString(),
+    pausedChats: pause.pausedChats || {},
+  });
+}
+
+function toggleGlobalPause() {
+  const pause = readPauseState();
+  pause.paused = !pause.paused;
+  pause.reason = pause.paused ? "keyboard-space" : "";
+  writePauseState(pause);
+  return pause.paused;
+}
+
+function startKeyboardControls() {
+  if (keyboardControlsStarted || !interactiveTerminal || typeof input.setRawMode !== "function") return;
+  keyboardControlsStarted = true;
+  input.setRawMode(true);
+  input.resume();
+  input.on("data", async (chunk) => {
+    const value = chunk.toString("utf8");
+    if (value === "\u0003") await shutdown(0);
+    if (value === " ") {
+      const paused = toggleGlobalPause();
+      console.log(paused ? "Paused WhatsApp auto-replies. Press Space to resume." : "Resumed WhatsApp auto-replies. Press Space to pause.");
+    }
+  });
+  console.log("Keyboard controls: Space toggles pause/resume. Ctrl+C exits.");
 }
 
 function setWhitelistDecision(chat, decision, source) {
@@ -885,6 +959,7 @@ function shellQuote(value) {
 
 async function shutdown(code) {
   if (rl) rl.close();
+  if (typeof input.setRawMode === "function") input.setRawMode(false);
   await client.destroy().catch(() => undefined);
   process.exit(code);
 }

@@ -152,7 +152,7 @@ digital-brain resume-whatsapp --chat "Mom"
 digital-brain whatsapp-status
 ```
 
-The running bot checks the pause file before each reply, so these commands do not require restarting the bot.
+The running bot checks the pause file before each reply, so these commands do not require restarting the bot. When the `auto-whatsapp` terminal is focused, press `Space` to pause/resume globally and `Ctrl+C` to exit.
 
 `--provider codex` runs a local Codex command. If `--codex-command` contains `{promptFile}`, Digital Brain writes the prompt to a temp file and substitutes the path; otherwise it pipes the prompt to stdin.
 
@@ -177,6 +177,7 @@ Guardrails:
 - single-threads reply generation so multiple incoming chats do not trigger overlapping sends
 - debounces live messages per chat, default 12000ms, so message bursts get one combined reply; override with `--reply-debounce-ms <ms>`
 - supports global and per-chat pause with `pause-whatsapp` / `resume-whatsapp`
+- supports a focused-terminal hotkey: `Space` toggles global pause/resume
 - skips likely business, notification, OTP, and service chats unless `--include-businesses` is passed or the chat is explicitly allowlisted by name or contact number
 - processes unread chats on startup unless `--no-process-unread` is passed
 - skips groups unless `--include-groups` is passed
