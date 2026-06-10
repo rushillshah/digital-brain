@@ -127,24 +127,29 @@ function disclosureStatus(chat) {
 
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   const name = chatName(chat);
-  const count = fs
+  const records = fs
     .readFileSync(logPath, "utf8")
     .split("\n")
     .filter(Boolean)
-    .map((line) => {
-      try {
-        return JSON.parse(line);
-      } catch {
-        return null;
-      }
-    })
+    .map(parseJsonLine)
     .filter((record) => record)
     .filter((record) => record.resolvedChatName === name)
-    .filter((record) => record.aiAssisted !== false)
+    .filter((record) => record.aiAssisted !== false);
+  const alreadyDisclosed = records.some((record) => record.disclosureIncluded);
+  if (alreadyDisclosed) return { required: false, count: 0, alreadyDisclosed: true };
+  const count = records
     .filter((record) => new Date(record.timestamp).getTime() >= cutoff)
     .filter((record) => !record.disclosureIncluded).length;
 
-  return { required: count >= 2, count };
+  return { required: count >= 2, count, alreadyDisclosed: false };
+}
+
+function parseJsonLine(line) {
+  try {
+    return JSON.parse(line);
+  } catch {
+    return null;
+  }
 }
 
 function containsDisclosure(message) {

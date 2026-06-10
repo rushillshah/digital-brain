@@ -137,7 +137,7 @@ Guardrails:
 - uses a per-chat cooldown, default 20 minutes
 - caps replies per chat per run, default 5
 - logs metadata by default, not full sent text
-- still enforces the AI disclosure rule after repeated AI-assisted sends
+- enforces the AI disclosure rule after repeated AI-assisted sends, but does not repeat it after that chat has already received a disclosure
 
 ## Local Cron
 
