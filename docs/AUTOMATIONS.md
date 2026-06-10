@@ -98,13 +98,14 @@ The generated script loops forever and sleeps for `refreshIntervalMinutes`. The 
 
 ## WhatsApp Auto-Reply
 
-`digital-brain auto-whatsapp` is separate from refresh automation. It uses WhatsApp Web for live incoming messages and either Ollama or a Codex command for reply generation. On startup it scans unread WhatsApp Web chats, then continues listening for new messages.
+`digital-brain auto-whatsapp` is separate from refresh automation. It uses WhatsApp Web for live incoming messages and Ollama, OpenAI, or Codex for reply generation. On startup it scans unread WhatsApp Web chats, then continues listening for new messages.
 
 Draft-only:
 
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
+OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini
 digital-brain auto-whatsapp --allow-all --provider codex
 digital-brain auto-whatsapp --allow-all --provider codex-app
 ```
@@ -114,6 +115,7 @@ Auto-send while the command is running:
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1 --yes
+OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini --yes
 digital-brain auto-whatsapp --allow-all --provider codex --yes
 digital-brain auto-whatsapp --allow-all --provider codex-app --yes
 ```
@@ -132,10 +134,13 @@ Provider options:
 
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --provider ollama --model llama3.1 --yes
+OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow "Mom" --provider openai --model gpt-4.1-mini --yes
 digital-brain auto-whatsapp --allow "Mom" --provider codex --yes
 digital-brain auto-whatsapp --allow "Mom" --provider codex-app --yes
 digital-brain auto-whatsapp --allow "Mom" --provider codex --codex-command "codex exec --skip-git-repo-check" --yes
 ```
+
+`--provider openai` sends the same Digital Brain prompt and relevant vault context to the OpenAI API. Set `OPENAI_API_KEY`, pass `--openai-api-key`, or choose OpenAI during `digital-brain init` and paste the key into the local vault config.
 
 `--provider codex` runs a local Codex command. If `--codex-command` contains `{promptFile}`, Digital Brain writes the prompt to a temp file and substitutes the path; otherwise it pipes the prompt to stdin.
 
@@ -153,6 +158,7 @@ Guardrails:
 
 - with `--provider ollama`, requires Ollama running locally
 - with `--provider ollama`, requires the selected model, for example `ollama pull llama3.1`
+- with `--provider openai`, requires `OPENAI_API_KEY`, `--openai-api-key`, or `openaiApiKey` in the vault config
 - with `--provider codex`, requires a working local Codex command
 - with `--provider codex-app`, requires a Codex desktop bridge automation/thread that writes response files
 - requires `--allow "Name"` or `--contact "+15551234567"` unless `--allow-all` is explicitly passed

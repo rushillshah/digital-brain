@@ -83,8 +83,8 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Generate reply-ready person context that keeps WhatsApp, iMessage, Slack, and LinkedIn evidence separate under the same person.
 - Create AI-readable memory files for future prompts.
 - Draft WhatsApp sends by default, send with explicit `--yes`, or configure auto-send mode during init.
-- Run an explicit WhatsApp auto-responder that uses Ollama or a Codex command plus vault memory while the command is running.
-- Choose the WhatsApp auto-reply provider during init: Ollama, Codex app bridge, or Codex CLI.
+- Run an explicit WhatsApp auto-responder that uses Ollama, OpenAI, or Codex plus vault memory while the command is running.
+- Choose the WhatsApp auto-reply provider during init: Ollama, OpenAI API, Codex app bridge, or Codex CLI.
 - Enforce an AI-disclosure guard after repeated AI-assisted sends.
 
 ## Core Commands
@@ -99,6 +99,7 @@ digital-brain import-linkedin --input ./linkedin-archive.zip
 digital-brain send-whatsapp --to "Name" --message "text"
 digital-brain auto-whatsapp --allow "Name" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
+OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini --yes
 digital-brain auto-whatsapp --allow-all --provider codex --yes
 digital-brain auto-whatsapp --allow-all --provider codex-app --yes
 ```
@@ -127,6 +128,7 @@ digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes --no-process-unread
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1 --yes
+OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini --yes
 digital-brain auto-whatsapp --allow-all --provider codex --yes
 digital-brain auto-whatsapp --allow-all --provider codex-app --yes
 ```
@@ -135,7 +137,13 @@ If you start without `--allow`, `--contact`, or `--allow-all` in an interactive 
 
 Even with `--allow-all`, likely business, notification, OTP, delivery, bank, and support chats are skipped by default. Use explicit `--allow "Name"` or `--contact "+15551234567"` for trusted personal chats. Pass `--include-businesses` only if you intentionally want those chats included.
 
-The default provider is local Ollama. `--provider codex` uses the Codex CLI. `--provider codex-app` uses a file bridge for the Codex desktop app.
+The default provider is local Ollama. `--provider openai` uses the OpenAI API with the same vault context prompt. `--provider codex` uses the Codex CLI. `--provider codex-app` uses a file bridge for the Codex desktop app.
+
+```bash
+OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini --yes
+```
+
+If you select `OpenAI API` during `digital-brain init`, you can either paste an API key to store it in the local vault config or leave it blank and set `OPENAI_API_KEY` before running `auto-whatsapp`.
 
 ```bash
 digital-brain auto-whatsapp --allow-all --provider codex --yes

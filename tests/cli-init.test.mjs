@@ -128,6 +128,29 @@ test("init can configure Codex app auto-reply provider", () => {
   assert.ok(fs.existsSync(path.join(vault, "08 Sources", "WhatsApp", "Outbound", "Codex App Bridge", "responses")));
 });
 
+test("init can configure OpenAI auto-reply provider and key", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  run([
+    cli,
+    "init",
+    vault,
+    "--yes",
+    "--auto-reply-provider",
+    "openai",
+    "--openai-model",
+    "gpt-4.1-mini",
+    "--openai-api-key",
+    "test-openai-key",
+    "--connect-ai=false",
+  ], { HOME: testHome(root) });
+
+  const config = readJson(path.join(vault, "digital-brain.config.json"));
+  assert.equal(config.autoReplyProvider, "openai");
+  assert.equal(config.autoReplyModel, "gpt-4.1-mini");
+  assert.equal(config.openaiApiKey, "test-openai-key");
+});
+
 test("noninteractive auto-send init requires responsibility acceptance", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");

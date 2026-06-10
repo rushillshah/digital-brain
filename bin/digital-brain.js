@@ -50,6 +50,8 @@ async function init(argv, args) {
   let timezone = args.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
   let outboundMode = args["outbound-mode"] || "draft";
   let autoReplyProvider = args["auto-reply-provider"] || args.provider || "ollama";
+  let openaiApiKey = args["openai-api-key"] || "";
+  let openaiModel = args["openai-model"] || "gpt-4.1-mini";
   let privacyMode = args["privacy-mode"] || "standard";
   let sourceMarkdownMode = args["source-markdown-mode"] || "none";
   let selectedSources = parseList(args.sources || "whatsapp");
@@ -109,9 +111,17 @@ async function init(argv, args) {
     if (outboundMode !== "disabled") {
       autoReplyProvider = await select(rl, "WhatsApp auto-reply brain", [
         ["ollama", "Ollama local model", "Runs fully local if Ollama and the model are installed.", "🦙"],
+        ["openai", "OpenAI API", "Fast hosted replies using the same Digital Brain context prompt.", "⚡"],
         ["codex-app", "Codex app bridge", "Uses request/response files for a Codex desktop automation or thread.", "🧠"],
         ["codex", "Codex CLI", "Uses a local codex command; only choose this if the CLI works.", "⌨️"],
       ], autoReplyProvider);
+      if (autoReplyProvider === "openai") {
+        openaiModel = await ask(rl, "🤖 OpenAI model", openaiModel);
+        openaiApiKey = await askSecret(rl, "🔑 OpenAI API key", {
+          fallbackLabel: process.env.OPENAI_API_KEY ? "OPENAI_API_KEY env found" : "use OPENAI_API_KEY at runtime",
+          helpText: "Paste a key to store it locally in this vault config. Leave blank to use OPENAI_API_KEY at runtime.",
+        });
+      }
     }
     connectAi = await confirm(rl, "🔗 Add global AI pointers for Codex/Claude/Gemini?", true);
     responsibilityAccepted = await responsibilityGate(rl, { schedule, outboundMode });
@@ -141,6 +151,8 @@ async function init(argv, args) {
     timezone,
     outboundMode,
     autoReplyProvider,
+    autoReplyModel: autoReplyProvider === "openai" ? openaiModel : args.model || undefined,
+    openaiApiKey: autoReplyProvider === "openai" && openaiApiKey ? openaiApiKey : undefined,
     privacyMode,
     sourceMarkdownMode,
     selectedSources,
@@ -183,6 +195,9 @@ async function init(argv, args) {
     } else {
       console.log("Codex app config was not detected. The bridge guide was still generated for later use.");
     }
+  }
+  if (autoReplyProvider === "openai" && !openaiApiKey && !process.env.OPENAI_API_KEY) {
+    console.log("OpenAI provider selected. Set OPENAI_API_KEY before running auto-whatsapp, or add openaiApiKey to the vault config.");
   }
   console.log("Next:");
   console.log("  digital-brain run");
@@ -310,6 +325,14 @@ function printSetupCheck(vault, options = {}) {
       optional: true,
     },
   ];
+  if (config.autoReplyProvider === "openai") {
+    checks.push({
+      label: "OpenAI API key",
+      ok: Boolean(process.env.OPENAI_API_KEY || config.openaiApiKey),
+      value: process.env.OPENAI_API_KEY ? "found in OPENAI_API_KEY" : config.openaiApiKey ? "stored in vault config" : "not found",
+      hint: "Set OPENAI_API_KEY or re-run init and choose OpenAI API.",
+    });
+  }
   if (selectedSources.includes("whatsapp")) {
     checks.push({
       label: "WhatsApp Mac database",
@@ -507,6 +530,13 @@ async function ask(rl, label, fallback, helpText = "") {
   return answer.trim() || fallback;
 }
 
+async function askSecret(rl, label, options = {}) {
+  if (options.helpText) console.log(`  ${options.helpText}`);
+  const suffix = options.fallbackLabel ? ` [${options.fallbackLabel}]` : "";
+  const answer = await rl.question(`${label}${suffix}: `);
+  return answer.trim();
+}
+
 async function askNumber(rl, label, fallback, options = {}) {
   const suffix = options.suffix ? ` ${options.suffix}` : "";
   const answer = await ask(rl, `${label}${suffix}`, String(fallback));
@@ -657,6 +687,6 @@ Usage:
   digital-brain extract --days 30
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]
-  digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|codex --model llama3.1 [--yes] [--no-process-unread]
+  digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|codex|codex-app --model llama3.1 [--yes] [--no-process-unread]
 `);
 }

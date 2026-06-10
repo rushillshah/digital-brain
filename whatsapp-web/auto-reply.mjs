@@ -23,8 +23,9 @@ const whitelistPath = path.join(outboundDir, "auto-reply-whitelist.json");
 const codexAppBridgeDir = path.join(outboundDir, "Codex App Bridge");
 const config = readConfig(vault);
 const provider = args.provider || config.autoReplyProvider || "ollama";
-const model = args.model || config.autoReplyModel || "llama3.1";
+const model = args.model || config.autoReplyModel || (provider === "openai" ? "gpt-4.1-mini" : "llama3.1");
 const codexCommand = args["codex-command"] || process.env.DIGITAL_BRAIN_CODEX_COMMAND || config.codexCommand || "codex exec --skip-git-repo-check";
+const openaiApiKey = args["openai-api-key"] || process.env.OPENAI_API_KEY || config.openaiApiKey || "";
 const allow = parseList(args.allow || "");
 const deny = parseList(args.deny || "");
 const contactNumbers = parseList([args.contact, args.phone, args["contact-number"]].filter(Boolean).join(","))
@@ -63,8 +64,10 @@ if (!hasInitialScope && !interactiveTerminal) {
 
 if (provider === "ollama") {
   await assertOllamaModel(model);
+} else if (provider === "openai") {
+  assertOpenAiConfig();
 } else if (!["codex", "codex-app"].includes(provider)) {
-  throw new Error(`Unsupported auto-reply provider "${provider}". Use "ollama", "codex", or "codex-app".`);
+  throw new Error(`Unsupported auto-reply provider "${provider}". Use "ollama", "openai", "codex", or "codex-app".`);
 }
 
 const client = new Client({
@@ -78,7 +81,7 @@ client.on("qr", (qr) => {
 });
 
 client.on("ready", async () => {
-  console.log(`Digital Brain WhatsApp auto-reply running with provider: ${provider}${provider === "ollama" ? ` (${model})` : ""}`);
+  console.log(`Digital Brain WhatsApp auto-reply running with provider: ${provider}${["ollama", "openai"].includes(provider) ? ` (${model})` : ""}`);
   console.log(sendEnabled ? "Auto-send is enabled." : "Draft mode. Replies will be logged but not sent. Add --yes or set outboundMode=auto-send to send.");
   if (!hasInitialScope) await configureInteractiveScope();
   console.log(runtimeAllowAll ? "Allowlist: all chats, with first-send approval per new chat." : allowlistSummary());
@@ -347,7 +350,42 @@ function readMemoryContext(chatName) {
 async function generateReply(prompt) {
   if (provider === "codex") return generateCodexReply(prompt);
   if (provider === "codex-app") return generateCodexAppReply(prompt);
+  if (provider === "openai") return generateOpenAiReply(prompt);
   return generateOllamaReply(prompt);
+}
+
+async function generateOpenAiReply(prompt) {
+  const timeoutMs = numberArg("provider-timeout-ms", 45000);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "authorization": `Bearer ${openaiApiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        input: prompt,
+        max_output_tokens: 160,
+        temperature: 0.35,
+      }),
+    });
+  } catch (error) {
+    if (error.name === "AbortError") throw new Error(`OpenAI reply timed out after ${timeoutMs}ms`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+  const text = await response.text();
+  if (!response.ok) throw new Error(`OpenAI reply failed: ${response.status} ${summarize(text)}`);
+  const body = parseJsonLine(text);
+  const reply = extractOpenAiText(body);
+  if (!reply) throw new Error("OpenAI returned an empty reply.");
+  return cleanReply(reply);
 }
 
 async function generateOllamaReply(prompt) {
@@ -463,6 +501,24 @@ async function assertOllamaModel(modelName) {
   if (!names.some((name) => name === modelName || name.startsWith(`${modelName}:`))) {
     throw new Error(`Ollama model "${modelName}" is not installed. Run: ollama pull ${modelName}`);
   }
+}
+
+function assertOpenAiConfig() {
+  if (!openaiApiKey) {
+    throw new Error("OpenAI provider requires an API key. Set OPENAI_API_KEY, pass --openai-api-key, or re-run init and enter the key.");
+  }
+}
+
+function extractOpenAiText(body) {
+  if (!body) return "";
+  if (typeof body.output_text === "string") return body.output_text;
+  const chunks = [];
+  for (const item of body.output || []) {
+    for (const content of item.content || []) {
+      if (typeof content.text === "string") chunks.push(content.text);
+    }
+  }
+  return chunks.join(" ");
 }
 
 function cleanReply(value) {
@@ -805,6 +861,6 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.error('Usage: digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|codex|codex-app --model llama3.1 [--yes] [--allow-all] [--include-groups] [--include-businesses]');
+  console.error('Usage: digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|codex|codex-app --model llama3.1 [--yes] [--allow-all] [--include-groups] [--include-businesses]');
   process.exit(1);
 }
