@@ -78,6 +78,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Merge confirmed-looking same-person profiles across sources into a person context index.
 - Infer provisional roles like parent, family group, work collaborator, close personal contact, or unlabeled contact.
 - Extract relationship-specific typing style: casing, message length, punctuation, emoji, and slang.
+- Extract your own outbound communication style so drafts can match your casing, slang, and punctuation.
 - Generate "how to continue this relationship" notes.
 - Generate reply-ready person context that keeps WhatsApp, iMessage, Slack, and LinkedIn evidence separate under the same person.
 - Create AI-readable memory files for future prompts.
@@ -122,6 +123,8 @@ digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes --no-process-unread
 ```
+
+Even with `--allow-all`, likely business, notification, OTP, delivery, bank, and support chats are skipped by default. Use explicit `--allow "Name"` for trusted personal chats. Pass `--include-businesses` only if you intentionally want those chats included.
 
 If Digital Brain has already sent two AI-assisted messages to the same chat in the last 24 hours, the next send must disclose that AI is helping unless you explicitly bypass the check.
 

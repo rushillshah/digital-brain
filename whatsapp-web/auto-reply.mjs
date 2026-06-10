@@ -5,6 +5,8 @@ import qrcode from "qrcode-terminal";
 import pkg from "whatsapp-web.js";
 
 const { Client, LocalAuth } = pkg;
+const BUSINESS_NAME_RE = /\b(amazon|flipkart|myntra|nykaa|swiggy|zomato|blinkit|zepto|uber|ola|rapido|delivery|courier|dunzo|paytm|phonepe|gpay|google pay|hdfc|icici|sbi|axis|kotak|amex|bank|airtel|jio|vodafone|vi|support|helpdesk|customer care|official|verified|business|meta ai|whatsapp|no[\s-]?reply|noreply|otp|login|security|alerts?|notifications?|offers?|promo|marketing)\b/i;
+const BUSINESS_BODY_RE = /\b(otp|one time password|verification code|login code|security code|do not share|order|delivered|delivery|shipment|tracking|invoice|payment|transaction|debited|credited|refund|ticket|support|unsubscribe|offer|coupon|sale|valid till|automated message)\b/i;
 const args = parseArgs(process.argv.slice(2));
 
 if (!args.vault) usage();
@@ -20,6 +22,7 @@ const allow = parseList(args.allow || "");
 const deny = parseList(args.deny || "");
 const allowAll = Boolean(args["allow-all"]);
 const includeGroups = Boolean(args["include-groups"]);
+const includeBusinesses = Boolean(args["include-businesses"]);
 const sendEnabled = Boolean(args.yes) || config.outboundMode === "auto-send";
 const processUnreadOnStart = !Boolean(args["no-process-unread"]);
 const cooldownMinutes = numberArg("cooldown-minutes", 20);
@@ -56,6 +59,7 @@ client.on("ready", async () => {
   console.log(`Digital Brain WhatsApp auto-reply running with Ollama model: ${model}`);
   console.log(sendEnabled ? "Auto-send is enabled." : "Draft mode. Replies will be logged but not sent. Add --yes or set outboundMode=auto-send to send.");
   console.log(allowAll ? "Allowlist: all chats." : `Allowlist: ${allow.join(", ")}`);
+  if (!includeBusinesses) console.log("Likely business, notification, OTP, and service chats are skipped by default.");
   try {
     if (processUnreadOnStart) {
       await processUnreadChats();
@@ -124,6 +128,11 @@ async function handleMessage(message, knownChat = null) {
   if (replyCount(name) >= maxRepliesPerChat) return;
 
   const recentMessages = await chat.fetchMessages({ limit: 12 });
+  if (shouldSkipNonPersonalChat(name, recentMessages)) {
+    console.log(`Skipping likely business/notification chat: ${name}`);
+    markProcessed(message, name, { sent: false });
+    return;
+  }
   const disclosure = disclosureStatus(name);
   const prompt = buildPrompt({
     chatName: name,
@@ -159,6 +168,8 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "You are helping the user reply on WhatsApp.",
     "Write exactly one message to send as the user.",
     "Be natural, concise, and relationship-appropriate.",
+    "Match the user's own communication style from My Communication Style. If it says lowercase-heavy or undercapitalized, prefer lowercase casual texting.",
+    "Do not sound like customer support, corporate email, or a generic AI assistant.",
     "Use the user's local memory context, but do not reveal private notes or say you read a vault.",
     "Do not invent facts, commitments, times, or promises.",
     disclosureRequired ? "This send requires AI disclosure. Include a short clear disclosure in the message." : "Do not mention AI unless disclosure is required.",
@@ -179,6 +190,7 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
 
 function readMemoryContext(chatName) {
   const files = [
+    path.join(vault, "06 AI Memory", "My Communication Style.md"),
     path.join(vault, "06 AI Memory", "Person Reply Context.md"),
     path.join(vault, "06 AI Memory", "Person Context Index.md"),
     path.join(vault, "06 AI Memory", "Interpreted Relationship Memory.md"),
@@ -248,8 +260,38 @@ function isAllowed(name) {
   return allow.some((item) => name.toLowerCase().includes(item.toLowerCase()));
 }
 
+function isExplicitlyAllowed(name) {
+  return allow.some((item) => name.toLowerCase().includes(item.toLowerCase()));
+}
+
 function isDenied(name) {
   return deny.some((item) => name.toLowerCase().includes(item.toLowerCase()));
+}
+
+function shouldSkipNonPersonalChat(name, recentMessages) {
+  if (includeBusinesses || isExplicitlyAllowed(name)) return false;
+  return isLikelyBusinessOrAutomation(name, recentMessages);
+}
+
+function isLikelyBusinessOrAutomation(name, recentMessages = []) {
+  const nameText = normalizeBusinessText(name);
+  const recentText = recentMessages
+    .slice(-8)
+    .map((message) => normalizeBusinessText(message.body || ""))
+    .join(" ");
+  if (isShortCodeOrServiceNumber(nameText)) return true;
+  if (BUSINESS_NAME_RE.test(nameText)) return true;
+  if (BUSINESS_BODY_RE.test(recentText)) return true;
+  return false;
+}
+
+function isShortCodeOrServiceNumber(text) {
+  const compacted = text.replace(/\D/g, "");
+  return compacted.length >= 4 && compacted.length <= 8 && compacted.length / Math.max(text.length, 1) > 0.7;
+}
+
+function normalizeBusinessText(value) {
+  return String(value || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function isCoolingDown(name) {
@@ -262,11 +304,13 @@ function replyCount(name) {
   return state.sentCountByChat[name] || 0;
 }
 
-function markProcessed(message, name) {
+function markProcessed(message, name, options = { sent: true }) {
   state.processedMessageIds.push(message.id?._serialized);
   state.processedMessageIds = state.processedMessageIds.filter(Boolean).slice(-1000);
-  state.lastSentAtByChat[name] = new Date().toISOString();
-  state.sentCountByChat[name] = replyCount(name) + 1;
+  if (options.sent !== false) {
+    state.lastSentAtByChat[name] = new Date().toISOString();
+    state.sentCountByChat[name] = replyCount(name) + 1;
+  }
   writeJsonAtomic(statePath, state);
 }
 
@@ -395,6 +439,7 @@ function parseArgs(argv) {
     if (arg === "--yes") out.yes = true;
     else if (arg === "--allow-all") out["allow-all"] = true;
     else if (arg === "--include-groups") out["include-groups"] = true;
+    else if (arg === "--include-businesses") out["include-businesses"] = true;
     else if (arg === "--no-process-unread") out["no-process-unread"] = true;
     else if (arg.startsWith("--")) {
       const key = arg.slice(2);
@@ -405,6 +450,6 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.error('Usage: digital-brain auto-whatsapp --allow "Name" --model llama3.1 [--yes] [--allow-all] [--include-groups]');
+  console.error('Usage: digital-brain auto-whatsapp --allow "Name" --model llama3.1 [--yes] [--allow-all] [--include-groups] [--include-businesses]');
   process.exit(1);
 }

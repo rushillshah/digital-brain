@@ -24,9 +24,12 @@ def main():
     messages = load_messages(sources, args.days)
     profiles = build_profiles(messages, args.min_messages)
     people = build_people(profiles)
+    self_profile = build_self_profile(messages)
     write_json_atomic(output_dir / "relationship_profiles.json", profiles)
     write_json_atomic(output_dir / "person_identity_map.json", people)
+    write_json_atomic(output_dir / "self_profile.json", self_profile)
     write_markdown(output_dir / "Relationship Map.md", profiles, args.days)
+    write_self_memory(vault / "06 AI Memory" / "My Communication Style.md", self_profile, args.days)
     write_people_memory(vault / "06 AI Memory" / "Person Context Index.md", people, args.days)
     write_legacy_whatsapp_outputs(vault, output_dir)
     print(f"Analyzed {len(messages)} messages.")
@@ -246,6 +249,31 @@ def build_people(profiles):
     return people
 
 
+def build_self_profile(messages):
+    outbound = [m for m in messages if m.get("fromMe") and (m.get("body") or "").strip()]
+    by_source = defaultdict(list)
+    for message in outbound:
+        by_source[message.get("sourceSystem") or source_system(message)].append(message)
+    dates = [m["_dt"] for m in outbound]
+    style = typing_style(outbound)
+    return {
+        "profileType": "self_communication_style",
+        "messageCount": len(outbound),
+        "firstSeen": min(dates).date().isoformat() if dates else None,
+        "lastSeen": max(dates).date().isoformat() if dates else None,
+        "sources": sorted(by_source.keys()),
+        "sourceBreakdown": {
+            source: {
+                "messageCount": len(items),
+                "typingStyle": typing_style(items),
+            }
+            for source, items in sorted(by_source.items())
+        },
+        "typingStyle": style,
+        "replyGuidance": self_reply_guidance(style),
+    }
+
+
 def write_markdown(path, profiles, days):
     lines = ["# Relationship Map", "", f"Window: last {days} days", "", "Generated signals. Treat as editable working notes.", ""]
     for profile in profiles:
@@ -263,6 +291,38 @@ def write_markdown(path, profiles, days):
             "",
         ])
     write_text_atomic(path, "\n".join(lines))
+
+
+def write_self_memory(path, profile, days):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    style = profile.get("typingStyle", {})
+    lines = [
+        "# My Communication Style",
+        "",
+        f"Window: last {days} days",
+        "",
+        "Generated from the user's own outbound messages. Treat this as the default voice for drafts and auto-replies.",
+        "",
+        f"- Outbound sample: {profile.get('messageCount', 0)} messages",
+        f"- Sources: {', '.join(profile.get('sources', [])) or 'none'}",
+        f"- Dates: {profile.get('firstSeen') or 'n/a'} to {profile.get('lastSeen') or 'n/a'}",
+        f"- Signature: {style.get('signature', 'unknown')}",
+        f"- Average length: {style.get('avgWords', 0)} words / {style.get('avgChars', 0)} chars",
+        f"- Lowercase share: {style.get('lowercaseShare', 0)}",
+        f"- Questions: {style.get('questionShare', 0)}",
+        f"- Exclamations: {style.get('exclamationShare', 0)}",
+        f"- Emoji share: {style.get('emojiShare', 0)}",
+        f"- Slang: {', '.join(style.get('slang', [])) or 'none'}",
+        "",
+        "## Reply Guidance",
+        "",
+    ]
+    for item in profile.get("replyGuidance", []):
+        lines.append(f"- {item}")
+    lines.extend(["", "## Source Breakdown", ""])
+    for source, data in profile.get("sourceBreakdown", {}).items():
+        lines.append(f"- {source}: {data.get('messageCount', 0)} outbound messages; {typing_style_summary(data.get('typingStyle', {}))}")
+    write_text_atomic(path, "\n".join(lines) + "\n")
 
 
 def write_people_memory(path, people, days):
@@ -289,7 +349,7 @@ def write_people_memory(path, people, days):
 def write_legacy_whatsapp_outputs(vault, output_dir):
     legacy_dir = vault / "08 Sources" / "WhatsApp" / "Analysis"
     legacy_dir.mkdir(parents=True, exist_ok=True)
-    for name in ("relationship_profiles.json", "person_identity_map.json", "Relationship Map.md"):
+    for name in ("relationship_profiles.json", "person_identity_map.json", "self_profile.json", "Relationship Map.md"):
         source = output_dir / name
         target = legacy_dir / name
         if source.exists():
@@ -374,6 +434,29 @@ def typing_style_summary(style):
         f"{style.get('signature', 'unknown')}; avg {style.get('avgWords', 0)} words; "
         f"lowercase {style.get('lowercaseShare', 0)}; emoji {style.get('emojiShare', 0)}; slang {slang}"
     )
+
+
+def self_reply_guidance(style):
+    guidance = []
+    signature = style.get("signature") or ""
+    if style.get("sampleSize", 0) == 0:
+        return ["No outbound sample yet; keep replies concise and natural."]
+    if style.get("lowercaseShare", 0) >= 0.45 or "lowercase-heavy" in signature:
+        guidance.append("Prefer undercapitalized/lowercase casual texting unless the context is formal.")
+    if style.get("avgWords", 0) <= 8:
+        guidance.append("Keep most replies short. Avoid polished essay-like phrasing.")
+    else:
+        guidance.append("Longer replies are normal when the topic needs context, but avoid sounding corporate.")
+    if style.get("questionShare", 0) >= 0.2:
+        guidance.append("It is natural to ask direct follow-up questions.")
+    if style.get("exclamationShare", 0) < 0.1:
+        guidance.append("Use exclamation marks sparingly.")
+    if style.get("emojiShare", 0) < 0.1:
+        guidance.append("Do not add emoji unless the recent chat already uses them.")
+    slang = style.get("slang", [])
+    if slang:
+        guidance.append(f"Known casual words/slang from the user's style: {', '.join(slang)}.")
+    return guidance
 
 
 def infer_typing_signature(avg_words, lowercase, questions, exclaims, emojis, slang):

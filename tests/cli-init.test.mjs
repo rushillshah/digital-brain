@@ -183,6 +183,58 @@ test("sample extractor and interpreter produce relationship memory", () => {
   assert.match(interpreted, /Generated draft/);
 });
 
+test("extract writes self communication style from outbound messages", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const raw = path.join(vault, "08 Sources", "WhatsApp", "Raw");
+  fs.mkdirSync(raw, { recursive: true });
+  fs.writeFileSync(path.join(raw, "2026-06-09.jsonl"), [
+    {
+      id: "friend-1",
+      sourceSystem: "WhatsApp",
+      timestamp: "2026-06-09T10:00:00+00:00",
+      chatName: "Close Friend",
+      isGroup: false,
+      fromMe: false,
+      author: "Close Friend",
+      body: "you free later?",
+    },
+    {
+      id: "me-1",
+      sourceSystem: "WhatsApp",
+      timestamp: "2026-06-09T10:01:00+00:00",
+      chatName: "Close Friend",
+      isGroup: false,
+      fromMe: true,
+      author: "Me",
+      body: "yeah bro give me 10",
+    },
+    {
+      id: "me-2",
+      sourceSystem: "WhatsApp",
+      timestamp: "2026-06-09T10:02:00+00:00",
+      chatName: "Close Friend",
+      isGroup: false,
+      fromMe: true,
+      author: "Me",
+      body: "i'll call rn",
+    },
+  ].map((record) => JSON.stringify(record)).join("\n"));
+
+  run([cli, "extract", "--vault", vault, "--days", "30", "--min-messages", "1"]);
+
+  const profile = readJson(path.join(vault, "08 Sources", "Analysis", "self_profile.json"));
+  assert.equal(profile.profileType, "self_communication_style");
+  assert.equal(profile.messageCount, 2);
+  assert.equal(profile.typingStyle.lowercaseShare, 1);
+  assert.match(profile.typingStyle.signature, /lowercase-heavy/);
+  assert.deepEqual(profile.typingStyle.slang, ["yeah", "bro", "rn"]);
+
+  const memory = read(path.join(vault, "06 AI Memory", "My Communication Style.md"));
+  assert.match(memory, /Prefer undercapitalized\/lowercase casual texting/);
+  assert.match(memory, /bro, rn/);
+});
+
 test("run uses remembered default vault", () => {
   const root = tempDir();
   const vault = path.join(root, "sample-vault");
