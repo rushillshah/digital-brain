@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
 import path from "node:path";
+import readline from "node:readline/promises";
+import { spawn } from "node:child_process";
+import { stdin as input, stdout as output } from "node:process";
 import qrcode from "qrcode-terminal";
 import pkg from "whatsapp-web.js";
 
@@ -16,14 +19,19 @@ const whatsAppDir = path.join(vault, "08 Sources", "WhatsApp");
 const outboundDir = path.join(whatsAppDir, "Outbound");
 const sessionDir = path.join(whatsAppDir, ".session");
 const statePath = path.join(outboundDir, "auto-reply-state.json");
+const whitelistPath = path.join(outboundDir, "auto-reply-whitelist.json");
 const config = readConfig(vault);
+const provider = args.provider || config.autoReplyProvider || "ollama";
 const model = args.model || config.autoReplyModel || "llama3.1";
+const codexCommand = args["codex-command"] || process.env.DIGITAL_BRAIN_CODEX_COMMAND || config.codexCommand || "codex exec --skip-git-repo-check";
 const allow = parseList(args.allow || "");
 const deny = parseList(args.deny || "");
 const contactNumbers = parseList([args.contact, args.phone, args["contact-number"]].filter(Boolean).join(","))
   .map(normalizePhone)
   .filter(Boolean);
 const allowAll = Boolean(args["allow-all"]);
+let runtimeAllowAll = allowAll;
+const autoApproveNewChats = Boolean(args["auto-approve-new-chats"]);
 const includeGroups = Boolean(args["include-groups"]);
 const includeBusinesses = Boolean(args["include-businesses"]);
 const sendEnabled = Boolean(args.yes) || config.outboundMode === "auto-send";
@@ -33,6 +41,12 @@ const maxRepliesPerChat = numberArg("max-replies-per-chat", 5);
 const maxContextChars = numberArg("max-context-chars", 12000);
 const outboundLogMode = args["log-mode"] || config.outboundLogMode || "metadata";
 const state = loadState();
+const whitelist = loadWhitelist();
+const hasStoredScope = Object.keys(whitelist.allowedChats || {}).length > 0;
+const hasInitialScope = allowAll || allow.length > 0 || contactNumbers.length > 0 || hasStoredScope;
+const interactiveTerminal = Boolean(input.isTTY && output.isTTY);
+let queueTail = Promise.resolve();
+const rl = interactiveTerminal ? readline.createInterface({ input, output }) : null;
 
 fs.mkdirSync(outboundDir, { recursive: true });
 
@@ -41,12 +55,16 @@ if (config.outboundMode === "disabled") {
   process.exit(1);
 }
 
-if (!allowAll && allow.length === 0 && contactNumbers.length === 0) {
+if (!hasInitialScope && !interactiveTerminal) {
   console.error('Refusing to auto-reply without an allowlist. Add --allow "Name", --contact "+15551234567", or pass --allow-all explicitly.');
   process.exit(1);
 }
 
-await assertOllamaModel(model);
+if (provider === "ollama") {
+  await assertOllamaModel(model);
+} else if (!["codex"].includes(provider)) {
+  throw new Error(`Unsupported auto-reply provider "${provider}". Use "ollama" or "codex".`);
+}
 
 const client = new Client({
   authStrategy: new LocalAuth({ clientId: "digital-brain", dataPath: sessionDir }),
@@ -59,9 +77,11 @@ client.on("qr", (qr) => {
 });
 
 client.on("ready", async () => {
-  console.log(`Digital Brain WhatsApp auto-reply running with Ollama model: ${model}`);
+  console.log(`Digital Brain WhatsApp auto-reply running with provider: ${provider}${provider === "ollama" ? ` (${model})` : ""}`);
   console.log(sendEnabled ? "Auto-send is enabled." : "Draft mode. Replies will be logged but not sent. Add --yes or set outboundMode=auto-send to send.");
-  console.log(allowAll ? "Allowlist: all chats." : allowlistSummary());
+  if (!hasInitialScope) await configureInteractiveScope();
+  console.log(runtimeAllowAll ? "Allowlist: all chats, with first-send approval per new chat." : allowlistSummary());
+  if (provider === "codex") console.log(`Codex command: ${codexCommand}`);
   if (!includeBusinesses) console.log("Likely business, notification, OTP, and service chats are skipped by default.");
   try {
     if (processUnreadOnStart) {
@@ -78,7 +98,7 @@ client.on("ready", async () => {
 client.on("message", async (message) => {
   try {
     console.log(`Received WhatsApp message event: ${summarize(message.body || "[non-text message]")}`);
-    await handleMessage(message);
+    enqueueMessage(message);
   } catch (error) {
     console.error(`Auto-reply error: ${error.message}`);
   }
@@ -115,8 +135,86 @@ async function processUnreadChats() {
       continue;
     }
     console.log(`Processing unread chat: ${name}`);
-    await handleMessage(latestInbound, chat);
+    await enqueueMessage(latestInbound, chat);
   }
+}
+
+async function configureInteractiveScope() {
+  console.log("");
+  console.log("Auto-reply scope:");
+  console.log("  A) all contacts, but ask once before the first AI reply to each new chat");
+  console.log("  S) select contacts from your WhatsApp chat list");
+  console.log("  Q) quit");
+  const answer = (await rl.question("Choose A/S/Q [S]: ")).trim().toLowerCase() || "s";
+  if (answer.startsWith("q")) {
+    await shutdown(0);
+    return;
+  }
+  if (answer.startsWith("a")) {
+    runtimeAllowAll = true;
+    console.log("Scope set to all contacts with first-send approval.");
+    return;
+  }
+  const chats = (await client.getChats())
+    .filter((chat) => includeGroups || !chat.isGroup)
+    .sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0))
+    .slice(0, numberArg("select-limit", 60));
+  if (chats.length === 0) {
+    console.log("No WhatsApp chats found to select.");
+    return;
+  }
+  console.log("");
+  console.log("Select contacts:");
+  chats.forEach((chat, index) => {
+    console.log(`  ${index + 1}) ${chatName(chat)}`);
+  });
+  const selection = await rl.question("Numbers to whitelist, comma-separated: ");
+  const selected = parseIndexSelection(selection, chats.length).map((index) => chats[index]);
+  for (const chat of selected) {
+    setWhitelistDecision(chat, "allow", "startup-select");
+  }
+  console.log(`Whitelisted ${selected.length} chat(s).`);
+}
+
+function enqueueMessage(message, knownChat = null) {
+  queueTail = queueTail
+    .catch(() => undefined)
+    .then(() => handleMessage(message, knownChat))
+    .catch((error) => console.error(`Auto-reply error: ${error.message}`));
+  return queueTail;
+}
+
+async function ensureChatApproved(chat, recentMessages) {
+  const name = chatName(chat);
+  if (isExplicitlyAllowed(chat) || isChatWhitelisted(chat)) return true;
+  if (isChatDenied(chat)) {
+    console.log(`Skipping stored denied chat: ${name}`);
+    return false;
+  }
+  if (!runtimeAllowAll) return false;
+  if (autoApproveNewChats) {
+    setWhitelistDecision(chat, "allow", "auto-approve-new-chats");
+    return true;
+  }
+  if (!interactiveTerminal) {
+    console.log(`Skipping ${name}: first-send approval required but no interactive terminal is available.`);
+    return false;
+  }
+  console.log("");
+  console.log(`New chat needs AI approval: ${name}`);
+  const inbound = recentMessages.filter((item) => !item.fromMe && !item.isStatus).slice(-3);
+  for (const item of inbound) {
+    console.log(`  ${name}: ${summarize(item.body || "[non-text message]")}`);
+  }
+  const answer = (await rl.question("Whitelist this chat for AI auto-replies? [y/N]: ")).trim().toLowerCase();
+  if (answer === "y" || answer === "yes") {
+    setWhitelistDecision(chat, "allow", "first-send-prompt");
+    console.log(`Whitelisted ${name}.`);
+    return true;
+  }
+  setWhitelistDecision(chat, "deny", "first-send-prompt");
+  console.log(`Denied ${name}.`);
+  return false;
 }
 
 async function handleMessage(message, knownChat = null) {
@@ -154,6 +252,10 @@ async function handleMessage(message, knownChat = null) {
     markProcessed(message, name, { sent: false });
     return;
   }
+  if (!(await ensureChatApproved(chat, recentMessages))) {
+    markProcessed(message, name, { sent: false });
+    return;
+  }
   const disclosure = disclosureStatus(name);
   const prompt = buildPrompt({
     chatName: name,
@@ -161,7 +263,7 @@ async function handleMessage(message, knownChat = null) {
     recentMessages,
     disclosureRequired: disclosure.required,
   });
-  console.log(`Generating reply for ${name} with ${model}...`);
+  console.log(`Generating reply for ${name} with ${provider}${provider === "ollama" ? `:${model}` : ""}...`);
   const startedAt = Date.now();
   const reply = await generateReply(prompt);
   console.log(`Generated reply for ${name} in ${Date.now() - startedAt}ms: ${summarize(reply || "[empty reply]")}`);
@@ -192,6 +294,9 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "You are helping the user reply on WhatsApp.",
     "Write exactly one message to send as the user.",
     "Be natural, concise, and relationship-appropriate.",
+    "First infer the immediate intent of the current conversation from the recent chat. Continue that thread only.",
+    "Do not start with hey/hi unless the recent chat itself uses that greeting pattern.",
+    "Mirror the vocabulary, register, and pacing already present in this chat.",
     "Match the user's own communication style from My Communication Style. If it says lowercase-heavy or undercapitalized, prefer lowercase casual texting.",
     "Use lexical signals from My Communication Style: recurring style words, openers, short phrase shapes, punctuation habits, and lowercase-i behavior.",
     "Do not sound like customer support, corporate email, or a generic AI assistant.",
@@ -238,6 +343,11 @@ function readMemoryContext(chatName) {
 }
 
 async function generateReply(prompt) {
+  if (provider === "codex") return generateCodexReply(prompt);
+  return generateOllamaReply(prompt);
+}
+
+async function generateOllamaReply(prompt) {
   const response = await fetch("http://127.0.0.1:11434/api/generate", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -251,6 +361,44 @@ async function generateReply(prompt) {
   if (!response.ok) throw new Error(`Ollama generate failed: ${response.status} ${await response.text()}`);
   const body = await response.json();
   return cleanReply(body.response || "");
+}
+
+async function generateCodexReply(prompt) {
+  return runReplyCommand(codexCommand, prompt, "codex");
+}
+
+async function runReplyCommand(command, prompt, label) {
+  const timeoutMs = numberArg("provider-timeout-ms", 120000);
+  const usesPromptFile = command.includes("{promptFile}");
+  const promptFile = usesPromptFile ? path.join(outboundDir, `reply-prompt-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`) : "";
+  if (promptFile) fs.writeFileSync(promptFile, prompt, "utf8");
+  const renderedCommand = promptFile ? command.replaceAll("{promptFile}", shellQuote(promptFile)) : command;
+  return await new Promise((resolve, reject) => {
+    const child = spawn(renderedCommand, { shell: true, cwd: vault, env: process.env });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      reject(new Error(`${label} reply command timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
+    child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      cleanupPromptFile(promptFile);
+      reject(error);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      cleanupPromptFile(promptFile);
+      if (code !== 0) {
+        reject(new Error(`${label} reply command failed with ${code}: ${summarize(stderr || stdout)}`));
+        return;
+      }
+      resolve(cleanReply(stdout));
+    });
+    if (!usesPromptFile) child.stdin.end(prompt);
+  });
 }
 
 async function assertOllamaModel(modelName) {
@@ -281,7 +429,9 @@ function cleanReply(value) {
 }
 
 function isAllowed(chatOrName) {
-  if (allowAll) return true;
+  if (isChatDenied(chatOrName)) return false;
+  if (isChatWhitelisted(chatOrName)) return true;
+  if (runtimeAllowAll) return true;
   const name = typeof chatOrName === "string" ? chatOrName : chatName(chatOrName);
   if (contactNumbers.some((number) => chatMatchesContact(chatOrName, number))) return true;
   return allow.some((item) => name.toLowerCase().includes(item.toLowerCase()));
@@ -298,7 +448,7 @@ function isDenied(name) {
 }
 
 function shouldSkipNonPersonalChat(chatOrName, recentMessages) {
-  if (includeBusinesses || isExplicitlyAllowed(chatOrName)) return false;
+  if (includeBusinesses || isExplicitlyAllowed(chatOrName) || isChatWhitelisted(chatOrName)) return false;
   const name = typeof chatOrName === "string" ? chatOrName : chatName(chatOrName);
   return isLikelyBusinessOrAutomation(name, recentMessages);
 }
@@ -356,7 +506,69 @@ function allowlistSummary() {
   const parts = [];
   if (allow.length) parts.push(`names: ${allow.join(", ")}`);
   if (contactNumbers.length) parts.push(`contacts: ${contactNumbers.map(maskPhone).join(", ")}`);
+  const storedCount = Object.keys(whitelist.allowedChats || {}).length;
+  if (storedCount) parts.push(`stored: ${storedCount} chat(s)`);
   return `Allowlist: ${parts.join("; ")}`;
+}
+
+function isChatWhitelisted(chatOrName) {
+  return Boolean(whitelist.allowedChats?.[chatKey(chatOrName)]);
+}
+
+function isChatDenied(chatOrName) {
+  return Boolean(whitelist.deniedChats?.[chatKey(chatOrName)]);
+}
+
+function setWhitelistDecision(chat, decision, source) {
+  const key = chatKey(chat);
+  const record = {
+    chatName: chatName(chat),
+    chatId: typeof chat === "string" ? null : chat.id?._serialized || null,
+    source,
+    updatedAt: new Date().toISOString(),
+  };
+  if (decision === "allow") {
+    whitelist.allowedChats[key] = record;
+    delete whitelist.deniedChats[key];
+  } else {
+    whitelist.deniedChats[key] = record;
+    delete whitelist.allowedChats[key];
+  }
+  writeJsonAtomic(whitelistPath, whitelist);
+}
+
+function chatKey(chatOrName) {
+  if (typeof chatOrName === "string") return `name:${chatOrName.toLowerCase()}`;
+  return chatOrName.id?._serialized || `name:${chatName(chatOrName).toLowerCase()}`;
+}
+
+function loadWhitelist() {
+  if (!fs.existsSync(whitelistPath)) return emptyWhitelist();
+  try {
+    return normalizeWhitelist(JSON.parse(fs.readFileSync(whitelistPath, "utf8")));
+  } catch {
+    return emptyWhitelist();
+  }
+}
+
+function normalizeWhitelist(value) {
+  return {
+    schemaVersion: 1,
+    allowedChats: value?.allowedChats || {},
+    deniedChats: value?.deniedChats || {},
+  };
+}
+
+function emptyWhitelist() {
+  return { schemaVersion: 1, allowedChats: {}, deniedChats: {} };
+}
+
+function parseIndexSelection(value, max) {
+  return [...new Set(String(value || "")
+    .split(/[,\s]+/)
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isInteger(item) && item >= 1 && item <= max)
+    .map((item) => item - 1))];
 }
 
 function isCoolingDown(name) {
@@ -461,6 +673,26 @@ function writeJsonAtomic(file, value) {
   const temp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(temp, `${JSON.stringify(value, null, 2)}\n`);
   fs.renameSync(temp, file);
+}
+
+function cleanupPromptFile(file) {
+  if (file) {
+    try {
+      fs.unlinkSync(file);
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+}
+
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
+
+async function shutdown(code) {
+  if (rl) rl.close();
+  await client.destroy().catch(() => undefined);
+  process.exit(code);
 }
 
 function visibleMessage(record, reply) {

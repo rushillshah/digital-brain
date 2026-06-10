@@ -96,13 +96,14 @@ The generated script loops forever and sleeps for `refreshIntervalMinutes`. The 
 
 ## WhatsApp Auto-Reply
 
-`digital-brain auto-whatsapp` is separate from refresh automation. It uses WhatsApp Web for live incoming messages and Ollama for local reply generation. On startup it scans unread WhatsApp Web chats, then continues listening for new messages.
+`digital-brain auto-whatsapp` is separate from refresh automation. It uses WhatsApp Web for live incoming messages and either Ollama or a Codex command for reply generation. On startup it scans unread WhatsApp Web chats, then continues listening for new messages.
 
 Draft-only:
 
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
+digital-brain auto-whatsapp --allow-all --provider codex
 ```
 
 Auto-send while the command is running:
@@ -110,6 +111,7 @@ Auto-send while the command is running:
 ```bash
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1 --yes
+digital-brain auto-whatsapp --allow-all --provider codex --yes
 ```
 
 Broad auto-send for personal chats:
@@ -120,6 +122,18 @@ digital-brain auto-whatsapp --allow-all --model llama3.1 --yes
 
 `--allow-all` still skips likely business, notification, OTP, bank, delivery, and support chats by default. Use `--include-businesses` only when you intentionally want those chats included. Prefer explicit `--allow "Name"` or `--contact "+15551234567"` for friends and family.
 
+When `--allow-all` is used, Digital Brain asks once before the first AI reply to each new chat and stores allow/deny decisions in `08 Sources/WhatsApp/Outbound/auto-reply-whitelist.json`. Use `--auto-approve-new-chats` only for fully unattended first sends.
+
+Provider options:
+
+```bash
+digital-brain auto-whatsapp --allow "Mom" --provider ollama --model llama3.1 --yes
+digital-brain auto-whatsapp --allow "Mom" --provider codex --yes
+digital-brain auto-whatsapp --allow "Mom" --provider codex --codex-command "codex exec --skip-git-repo-check" --yes
+```
+
+`--provider codex` runs a local Codex command. If `--codex-command` contains `{promptFile}`, Digital Brain writes the prompt to a temp file and substitutes the path; otherwise it pipes the prompt to stdin.
+
 If you selected `Auto-send while running` during init, `auto-whatsapp` can send without `--yes` while it is running:
 
 ```bash
@@ -128,9 +142,11 @@ digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 
 Guardrails:
 
-- requires Ollama running locally
-- requires the selected model, for example `ollama pull llama3.1`
+- with `--provider ollama`, requires Ollama running locally
+- with `--provider ollama`, requires the selected model, for example `ollama pull llama3.1`
+- with `--provider codex`, requires a working local Codex command
 - requires `--allow "Name"` or `--contact "+15551234567"` unless `--allow-all` is explicitly passed
+- single-threads reply generation so multiple incoming chats do not trigger overlapping sends
 - skips likely business, notification, OTP, and service chats unless `--include-businesses` is passed or the chat is explicitly allowlisted by name or contact number
 - processes unread chats on startup unless `--no-process-unread` is passed
 - skips groups unless `--include-groups` is passed

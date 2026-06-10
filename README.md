@@ -83,7 +83,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Generate reply-ready person context that keeps WhatsApp, iMessage, Slack, and LinkedIn evidence separate under the same person.
 - Create AI-readable memory files for future prompts.
 - Draft WhatsApp sends by default, send with explicit `--yes`, or configure auto-send mode during init.
-- Run an explicit WhatsApp auto-responder that uses local Ollama plus vault memory while the command is running.
+- Run an explicit WhatsApp auto-responder that uses Ollama or a Codex command plus vault memory while the command is running.
 - Enforce an AI-disclosure guard after repeated AI-assisted sends.
 
 ## Core Commands
@@ -98,6 +98,7 @@ digital-brain import-linkedin --input ./linkedin-archive.zip
 digital-brain send-whatsapp --to "Name" --message "text"
 digital-brain auto-whatsapp --allow "Name" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
+digital-brain auto-whatsapp --allow-all --provider codex --yes
 ```
 
 `init` remembers your vault globally, so `run` works from anywhere. `run` syncs the live local sources you selected, extracts relationships, and writes interpreted memory in one command.
@@ -124,9 +125,20 @@ digital-brain auto-whatsapp --allow "Mom" --model llama3.1
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes
 digital-brain auto-whatsapp --allow "Mom" --model llama3.1 --yes --no-process-unread
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1 --yes
+digital-brain auto-whatsapp --allow-all --provider codex --yes
 ```
 
+If you start without `--allow`, `--contact`, or `--allow-all` in an interactive terminal, Digital Brain asks whether to cover all contacts or select contacts from your WhatsApp chat list. With `--allow-all`, it still asks once before the first AI reply to each new chat and stores the decision in `08 Sources/WhatsApp/Outbound/auto-reply-whitelist.json`. Use `--auto-approve-new-chats` only if you intentionally want unattended first sends.
+
 Even with `--allow-all`, likely business, notification, OTP, delivery, bank, and support chats are skipped by default. Use explicit `--allow "Name"` or `--contact "+15551234567"` for trusted personal chats. Pass `--include-businesses` only if you intentionally want those chats included.
+
+The default provider is local Ollama. To use Codex instead:
+
+```bash
+digital-brain auto-whatsapp --allow-all --provider codex --yes
+```
+
+If your Codex CLI needs a custom command, pass `--codex-command "..."` or set `DIGITAL_BRAIN_CODEX_COMMAND`. If the command contains `{promptFile}`, Digital Brain writes the reply prompt to a temp file and substitutes that path; otherwise it pipes the prompt to stdin.
 
 If Digital Brain has already sent two AI-assisted messages to the same chat in the last 24 hours, the next send must disclose that AI is helping. Once that chat has received an AI disclosure, Digital Brain will not keep repeating it.
 

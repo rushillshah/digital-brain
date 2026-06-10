@@ -593,6 +593,6 @@ Usage:
   digital-brain extract --days 30
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]
-  digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --model llama3.1 [--yes] [--no-process-unread]
+  digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|codex --model llama3.1 [--yes] [--no-process-unread]
 `);
 }
