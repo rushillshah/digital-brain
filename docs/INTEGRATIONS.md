@@ -8,13 +8,17 @@ Digital Brain prefers official exports and local files over scraping.
 digital-brain run
 ```
 
-WhatsApp support reads the local macOS WhatsApp database when available.
+WhatsApp has two ingestion paths:
+
+- `sync-whatsapp`: reads the local macOS WhatsApp database when available.
+- `sync-whatsapp-web`: uses a linked WhatsApp Web/Desktop session as a cross-platform fallback for Mac, Windows, and Linux.
 
 Dependency selected in setup:
 
 - Install/open WhatsApp for Mac and log in: https://faq.whatsapp.com/686469079565350
 - If macOS blocks access, grant Full Disk Access to the terminal app running Digital Brain.
 - If WhatsApp is selected and the database is missing, `digital-brain run` exits with an error.
+- For WhatsApp Desktop/Web, run `digital-brain sync-whatsapp-web --days 30` and scan the QR from WhatsApp > Linked devices on first use.
 
 ## Apple iMessage
 

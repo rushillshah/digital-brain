@@ -31,6 +31,6 @@ This is not yet a signed `.app` release. Before public desktop distribution:
 - add packaging and signing
 - add permission education screens for local app databases
 - add a safer background daemon model
-- add source-specific setup diagnostics
+- add source-specific setup diagnostics, including WhatsApp Mac database vs WhatsApp Desktop/Web linked-device sync
 - add an approval queue for outbound messaging
 - keep the CLI as the engine so terminal and desktop behavior stay consistent

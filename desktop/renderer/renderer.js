@@ -13,6 +13,7 @@ const views = {
 
 const integrations = [
   ["whatsapp", "WhatsApp", "Live local sync from WhatsApp for Mac database, plus optional Web outbound.", "Local database", "ready"],
+  ["whatsapp-web", "WhatsApp Desktop/Web", "Cross-platform sync through a linked WhatsApp Web/Desktop session.", "Linked device", "ready"],
   ["imessage", "iMessage", "Local macOS Messages import for personal message context.", "macOS only", "ready"],
   ["slack", "Slack", "Import official Slack workspace exports into work and people context.", "Export", "manual"],
   ["linkedin", "LinkedIn", "Import official LinkedIn archives for connections and messages.", "Export", "manual"],

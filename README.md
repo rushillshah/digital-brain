@@ -92,6 +92,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - An Obsidian-friendly Markdown vault.
 - AI adapter files for Codex, Claude, and Gemini.
 - WhatsApp Mac import tools.
+- WhatsApp Desktop/Web linked-device import tools.
 - Apple iMessage import tools.
 - Slack export import tools.
 - LinkedIn data archive import tools.
@@ -106,6 +107,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 ## What It Can Do
 
 - Import recent WhatsApp history from the local macOS WhatsApp database.
+- Import recent WhatsApp history through a cross-platform WhatsApp Web/Desktop linked-device session.
 - Import recent iMessage history from the local macOS Messages database.
 - Import Slack workspace exports.
 - Import LinkedIn data archives for connections and messages when available.
@@ -134,6 +136,8 @@ digital-brain run
 digital-brain demo-proof --out ./demo-assets
 digital-brain showcase --out ./demo-assets
 digital-brain doctor
+digital-brain sync-whatsapp --days 30
+digital-brain sync-whatsapp-web --days 30
 digital-brain sync-imessage --days 30
 digital-brain import-slack --input ./slack-export.zip
 digital-brain import-linkedin --input ./linkedin-archive.zip
@@ -174,6 +178,7 @@ The lower-level commands still exist for debugging:
 
 ```bash
 digital-brain sync-whatsapp
+digital-brain sync-whatsapp-web
 digital-brain sync-imessage
 digital-brain extract
 digital-brain interpret
@@ -293,7 +298,7 @@ Growth and contributor tooling is documented in [docs/GROWTH.md](docs/GROWTH.md)
 
 Digital Brain is local-first. It does not upload messages or notes.
 
-WhatsApp support reads the local macOS WhatsApp database when available. This is experimental and unofficial. Outbound messaging uses WhatsApp Web through `whatsapp-web.js`.
+WhatsApp Mac support reads the local macOS WhatsApp database when available. WhatsApp Desktop/Web support uses a linked WhatsApp Web session and can work as a cross-platform fallback, including Windows, without depending on the macOS database. Both paths are experimental and unofficial. Outbound messaging uses WhatsApp Web through `whatsapp-web.js`.
 
 Apple iMessage support reads the local macOS Messages `chat.db` when available. If the database is missing or inaccessible and iMessage was selected, `digital-brain run` fails with a clear setup error instead of silently skipping it.
 

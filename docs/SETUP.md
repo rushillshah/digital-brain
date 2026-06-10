@@ -18,6 +18,7 @@ After the quiz, `init` runs a setup check for:
 - Python sqlite3 support
 - selected live source access:
   - WhatsApp for Mac local database access
+  - WhatsApp Desktop/Web linked-device sync
   - Apple Messages local database access
 - selected import source instructions:
   - Slack export link
@@ -41,6 +42,7 @@ digital-brain tutorial
 Digital Brain does not silently install or configure system apps.
 
 - WhatsApp for Mac must be installed and logged in by the user.
+- WhatsApp Desktop/Web sync requires scanning a QR with WhatsApp > Linked devices.
 - Apple Messages must be opened by the user before iMessage sync can read `~/Library/Messages/chat.db`.
 - macOS may require Full Disk Access for the terminal app.
 - Ollama is optional and only needed for local LLM workflows.
@@ -74,5 +76,6 @@ Useful direct sync commands:
 
 ```bash
 digital-brain sync-whatsapp --days 30
+digital-brain sync-whatsapp-web --days 30
 digital-brain sync-imessage --days 30
 ```

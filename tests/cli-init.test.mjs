@@ -451,12 +451,13 @@ test("run dry-run uses selected sources and import guidance", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
   const home = testHome(root);
-  run([cli, "init", vault, "--yes", "--sources", "imessage,slack", "--connect-ai=false"], { HOME: home });
+  run([cli, "init", vault, "--yes", "--sources", "imessage,slack,whatsapp-web", "--connect-ai=false"], { HOME: home });
   const result = run([cli, "run", "--dry-run"], { HOME: home });
 
   assert.match(result.stdout, /sync iMessage/);
+  assert.match(result.stdout, /sync WhatsApp Desktop\/Web/);
   assert.match(result.stdout, /Slack: import-only/);
-  assert.doesNotMatch(result.stdout, /sync WhatsApp/);
+  assert.doesNotMatch(result.stdout, /sync WhatsApp Mac/);
 });
 
 test("tutorial prints setup guidance", () => {
@@ -475,6 +476,21 @@ test("auto-whatsapp requires an explicit allowlist", () => {
 
   assert.notEqual(result.status, 0);
   assert.match(`${result.stdout}\n${result.stderr}`, /Refusing to auto-reply without an allowlist/);
+});
+
+test("whatsapp web desktop sync is wired as a cross-platform source", () => {
+  const source = read(path.join(repo, "bin", "digital-brain.js"));
+  const syncSource = read(path.join(repo, "whatsapp-web", "sync.mjs"));
+  const desktopSource = read(path.join(repo, "desktop", "renderer", "renderer.js"));
+
+  assert.match(source, /sync-whatsapp-web/);
+  assert.match(source, /WhatsApp Desktop\/Web/);
+  assert.match(source, /whatsapp-web\/sync\.mjs/);
+  assert.match(source, /runNodeStep/);
+  assert.match(syncSource, /WhatsApp Web\/Desktop linked device/);
+  assert.match(syncSource, /limit-per-chat/);
+  assert.match(syncSource, /web-seen-message-ids\.json/);
+  assert.match(desktopSource, /whatsapp-web/);
 });
 
 test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", () => {

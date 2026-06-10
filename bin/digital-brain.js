@@ -34,6 +34,7 @@ async function main() {
   else if (command === "tutorial" || command === "setup-check") doctor({ tutorial: true });
   else if (command === "demo-proof" || command === "showcase") demoProof(argv, args);
   else if (command === "sync-whatsapp") runPython("digital_brain_whatsapp_mac_sync.py", argv);
+  else if (command === "sync-whatsapp-web") runNode("whatsapp-web/sync.mjs", argv);
   else if (command === "sync-imessage") runPython("digital_brain_imessage_sync.py", argv);
   else if (command === "import-slack") runPython("digital_brain_slack_export_import.py", argv);
   else if (command === "import-linkedin") runPython("digital_brain_linkedin_export_import.py", argv);
@@ -118,6 +119,7 @@ async function init(argv, args) {
     activeWindow = await ask(rl, "🪟 Active window for frequent refreshes", activeWindow);
     selectedSources = await multiSelect(rl, "Sources to set up", [
       ["whatsapp", "WhatsApp Mac", "Live local sync from WhatsApp for Mac database.", "💚"],
+      ["whatsapp-web", "WhatsApp Desktop/Web", "Cross-platform sync through a linked WhatsApp Web/Desktop session.", "🌐"],
       ["imessage", "Apple iMessage", "Live local sync from macOS Messages database.", "💬"],
       ["slack", "Slack export", "Import official Slack workspace export ZIP/folder.", "🧵"],
       ["linkedin", "LinkedIn archive", "Import official LinkedIn data archive ZIP/folder.", "💼"],
@@ -300,7 +302,8 @@ async function runRefresh(argv, args) {
   console.log(`Digital Brain refresh: ${vault}`);
   if (toBoolean(args["dry-run"])) {
     console.log("Dry run. Planned steps:");
-    if (selectedSources.includes("whatsapp")) console.log(`  sync WhatsApp: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
+    if (selectedSources.includes("whatsapp")) console.log(`  sync WhatsApp Mac: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
+    if (selectedSources.includes("whatsapp-web")) console.log(`  sync WhatsApp Desktop/Web: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
     if (selectedSources.includes("imessage")) console.log(`  sync iMessage: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
     if (selectedSources.includes("slack")) console.log("  Slack: import-only; run digital-brain import-slack --input <export.zip>");
     if (selectedSources.includes("linkedin")) console.log("  LinkedIn: import-only; run digital-brain import-linkedin --input <archive.zip>");
@@ -313,7 +316,8 @@ async function runRefresh(argv, args) {
   }
   await emitTelemetry("run_started", { sources: selectedSources, days }, { enabled: telemetryEnabled, vaultConfig: config });
   const steps = [];
-  if (selectedSources.includes("whatsapp")) steps.push(["sync WhatsApp", "sync-whatsapp", "digital_brain_whatsapp_mac_sync.py", syncArgs]);
+  if (selectedSources.includes("whatsapp")) steps.push(["sync WhatsApp Mac", "sync-whatsapp", "digital_brain_whatsapp_mac_sync.py", syncArgs]);
+  if (selectedSources.includes("whatsapp-web")) steps.push(["sync WhatsApp Desktop/Web", "sync-whatsapp-web", "whatsapp-web/sync.mjs", syncArgs]);
   if (selectedSources.includes("imessage")) steps.push(["sync iMessage", "sync-imessage", "digital_brain_imessage_sync.py", syncArgs]);
   if (selectedSources.includes("repos") && repoPaths.length) steps.push(["import repos", "import-repos", "digital_brain_repo_context_import.py", repoArgs]);
   if (selectedSources.includes("repos") && !repoPaths.length) console.log("\n→ import repos skipped: no repoPaths configured");
@@ -328,7 +332,7 @@ async function runRefresh(argv, args) {
       continue;
     }
     console.log(`\n→ ${label}`);
-    const result = runPythonStep(script, stepArgs);
+    const result = script.endsWith(".mjs") ? runNodeStep(script, stepArgs) : runPythonStep(script, stepArgs);
     if ((result.status ?? 1) !== 0) {
       await emitTelemetry("run_failed", { step: skipKey, status: result.status ?? 1 }, { enabled: telemetryEnabled, vaultConfig: config });
       process.exit(result.status ?? 1);
@@ -364,6 +368,10 @@ async function connectRepos(argv, args) {
 
 function runPythonStep(script, argv) {
   return spawnSync("python3", [path.join(root, "scripts", script), ...argv], { stdio: "inherit" });
+}
+
+function runNodeStep(script, argv) {
+  return spawnSync(process.execPath, [path.join(root, script), ...argv], { stdio: "inherit" });
 }
 
 function runNode(script, argv) {
@@ -538,6 +546,15 @@ function printSetupCheck(vault, options = {}) {
       hint: "Install/open WhatsApp for Mac, log in, then grant Terminal Full Disk Access if needed: https://faq.whatsapp.com/686469079565350",
     });
   }
+  if (selectedSources.includes("whatsapp-web")) {
+    checks.push({
+      label: "WhatsApp Desktop/Web linked session",
+      ok: true,
+      value: "scan QR on first run",
+      hint: "Run: digital-brain sync-whatsapp-web. It uses WhatsApp Linked devices through WhatsApp Web.",
+      optional: true,
+    });
+  }
   if (selectedSources.includes("imessage")) {
     checks.push({
       label: "Apple Messages database",
@@ -615,6 +632,9 @@ function printSetupCheck(vault, options = {}) {
     let step = 1;
     if (selectedSources.includes("whatsapp")) {
       console.log(`  ${step++}. Open WhatsApp for Mac once and keep it logged in.`);
+    }
+    if (selectedSources.includes("whatsapp-web")) {
+      console.log(`  ${step++}. Run digital-brain sync-whatsapp-web and scan the QR from WhatsApp > Linked devices.`);
     }
     if (selectedSources.includes("imessage")) {
       console.log(`  ${step++}. Open Messages on macOS once and grant Terminal Full Disk Access if needed.`);
@@ -1038,15 +1058,16 @@ function demoTerminalTranscript() {
   return `$ npx digital-brain init
 ◇ Sources to set up
   A) WhatsApp Mac
-  B) Apple iMessage
-  C) Slack export
-  D) LinkedIn archive
-  E) Git repositories
+  B) WhatsApp Desktop/Web
+  C) Apple iMessage
+  D) Slack export
+  E) LinkedIn archive
+  F) Git repositories
 
 $ digital-brain run
 Digital Brain refresh: ./Digital Brain Vault
 
-→ sync WhatsApp
+→ sync WhatsApp Mac
 Added sample messages.
 
 → extract
@@ -1098,6 +1119,7 @@ Usage:
   digital-brain doctor
   digital-brain tutorial
   digital-brain sync-whatsapp --days 30
+  digital-brain sync-whatsapp-web --days 30
   digital-brain sync-imessage --days 30
   digital-brain import-slack --input slack-export.zip
   digital-brain import-linkedin --input linkedin-archive.zip
