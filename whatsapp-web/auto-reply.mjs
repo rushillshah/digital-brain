@@ -337,6 +337,9 @@ async function handleMessage(message, knownChat = null) {
 function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequired }) {
   const memory = readMemoryContext(chatName);
   const unansweredInbound = latestUnansweredInbound(recentMessages, incomingBody);
+  const selfRecentMessages = recentMessages.filter((item) => item.fromMe && compact(item.body || "")).map((item) => item.body || "");
+  const language = languageProfile(recentMessages);
+  const slang = slangProfile(selfRecentMessages);
   const selfExamples = recentMessages
     .filter((item) => item.fromMe && compact(item.body || ""))
     .slice(-6)
@@ -361,10 +364,12 @@ function buildPrompt({ chatName, incomingBody, recentMessages, disclosureRequire
     "Do not start with hey/hi unless the recent chat itself uses that greeting pattern.",
     "Primary style source: the user's recent messages in this exact chat. Match their length, casing, bluntness, and punctuation from those examples.",
     "Secondary style source: My Communication Style. Use it only to break ties, not to add extra slang.",
+    languageInstruction(language),
+    slangInstruction(slang),
     replyStyleInstruction(replyStyleMode),
     "Do not perform a persona. Do not intensify the tone beyond the user's examples.",
     punctuationInstruction(replyStyleMode),
-    "Do not force bro, lol, haha, lmao, wild, rn, emojis, or question marks. Use them only if the user's recent examples in this chat use them naturally.",
+    "Do not force lol, haha, lmao, wild, rn, emojis, or question marks. Use them only if the user's recent examples in this chat use them naturally.",
     "Avoid assistant-like niceness and filler such as sounds perfect, happy to, sure thing, smooth, quick, no worries, no demon stuff, digital prep chef, digital neil, spitting facts, living in the future, or let’s unless that exact energy is already in the chat.",
     "If the recipient asks about AI, answer directly in the user's casual tone and do not overexplain.",
     "Do not sound like customer support, corporate email, or a generic AI assistant.",
@@ -402,6 +407,39 @@ function latestUnansweredInbound(recentMessages, incomingBody) {
   }
   if (chunk.length) return chunk.join("\n");
   return compact(incomingBody || "") ? `Them: ${compact(incomingBody || "")}` : "No clear unanswered inbound text.";
+}
+
+function languageProfile(recentMessages) {
+  const text = recentMessages
+    .slice(-16)
+    .map((item) => compact(item.body || ""))
+    .join(" ")
+    .toLowerCase();
+  const hindiTokens = text.match(/\b(acha|achha|arre|arey|haan|ha|nahi|nahin|kya|kyu|kyun|kaise|kar|karna|karo|chal|jaldi|thoda|bahut|mat|hai|hain|ho|tha|thi|badh|badh raha|theek|yaar)\b/g) || [];
+  const devanagari = text.match(/[\u0900-\u097F]/g) || [];
+  return {
+    hasHindi: hindiTokens.length >= 3 || devanagari.length >= 3,
+  };
+}
+
+function languageInstruction(profile) {
+  if (profile.hasHindi) {
+    return "Language guard: this exact chat shows Hindi/Hinglish usage, so light Hindi/Hinglish is allowed only if it matches the user's recent messages here.";
+  }
+  return "Language guard: reply in English. Do not use Hindi, Hinglish, romanized Hindi, or words like chal, kar, jaldi, thoda, badh raha, hai, haan, nahi unless the user's recent messages in this exact chat use them.";
+}
+
+function slangProfile(messages) {
+  const text = messages.join(" ").toLowerCase();
+  return {
+    usesBro: /\bbro\b/.test(text),
+  };
+}
+
+function slangInstruction(profile) {
+  return profile.usesBro
+    ? "Slang guard: the user's recent messages in this chat use bro, so bro is allowed only if it fits the immediate reply."
+    : "Slang guard: do not use bro in this chat. Do not transfer slang from other chats into this relationship.";
 }
 
 function replyStyleInstruction(mode) {
