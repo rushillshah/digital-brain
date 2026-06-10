@@ -599,6 +599,89 @@ test("slack and linkedin imports feed relationship memory", () => {
   assert.match(read(path.join(vault, "04 People", "LinkedIn Connections.md")), /Ada Lovelace/);
 });
 
+test("gmail takeout import writes email memory", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const mbox = path.join(root, "mail.mbox");
+  fs.writeFileSync(mbox, [
+    "From sender@example.com Tue Jun 09 10:00:00 2026",
+    "Message-ID: <m1@example.com>",
+    "Date: Tue, 09 Jun 2026 10:00:00 +0000",
+    "From: Friend <friend@example.com>",
+    "To: Me <me@example.com>",
+    "Subject: Re: Demo follow up",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    "Can you send the demo later today?",
+    "",
+    "From sender@example.com Tue Jun 09 10:05:00 2026",
+    "Message-ID: <m2@example.com>",
+    "Date: Tue, 09 Jun 2026 10:05:00 +0000",
+    "From: Me <me@example.com>",
+    "To: Friend <friend@example.com>",
+    "Subject: Re: Demo follow up",
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    "yes will send it",
+    "",
+  ].join("\n"));
+
+  run([cli, "import-gmail", "--vault", vault, "--input", mbox, "--self-email", "me@example.com", "--days", "30"]);
+  run([cli, "extract", "--vault", vault, "--days", "30", "--min-messages", "1"]);
+
+  const raw = readAllJsonl(path.join(vault, "08 Sources", "Gmail", "Raw"));
+  assert.equal(raw.length, 2);
+  assert.equal(raw[1].fromMe, true);
+  assert.equal(raw[0].sourceSystem, "Gmail");
+  const memory = read(path.join(vault, "06 AI Memory", "Email Context.md"));
+  assert.match(memory, /Demo follow up/);
+  assert.match(memory, /friend@example.com/);
+});
+
+test("google calendar import writes calendar memory", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const ics = path.join(root, "calendar.ics");
+  fs.writeFileSync(ics, [
+    "BEGIN:VCALENDAR",
+    "BEGIN:VEVENT",
+    "UID:event-1",
+    "DTSTART:20260610T100000Z",
+    "DTEND:20260610T103000Z",
+    "SUMMARY:Project standup",
+    "DESCRIPTION:Discuss launch checklist",
+    "LOCATION:Zoom",
+    "ORGANIZER:mailto:lead@example.com",
+    "ATTENDEE:mailto:me@example.com",
+    "ATTENDEE:mailto:teammate@example.com",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\n"));
+
+  run([cli, "import-calendar", "--vault", vault, "--input", ics, "--past-days", "365", "--future-days", "365"]);
+
+  const events = read(path.join(vault, "08 Sources", "Google Calendar", "Raw", "events.jsonl")).trim().split("\n").map((line) => JSON.parse(line));
+  assert.equal(events.length, 1);
+  assert.equal(events[0].title, "Project standup");
+  assert.equal(events[0].sourceSystem, "Google Calendar");
+  const memory = read(path.join(vault, "06 AI Memory", "Calendar Context.md"));
+  assert.match(memory, /Project standup/);
+  assert.match(memory, /teammate@example.com/);
+});
+
+test("slack and imessage send commands draft by default", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  fs.mkdirSync(vault, { recursive: true });
+  fs.writeFileSync(path.join(vault, "digital-brain.config.json"), "{}");
+
+  run([cli, "send-slack", "--vault", vault, "--channel", "C123", "--message", "hello"]);
+  run([cli, "send-imessage", "--vault", vault, "--to", "+15551234567", "--message", "hello"]);
+
+  assert.match(read(path.join(vault, "08 Sources", "Slack", "Outbound", "Sent.md")), /draft/);
+  assert.match(read(path.join(vault, "08 Sources", "iMessage", "Outbound", "Sent.md")), /draft/);
+});
+
 test("import-repos writes project context from local repositories", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");

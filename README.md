@@ -63,8 +63,11 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Apple iMessage import tools.
 - Slack export import tools.
 - LinkedIn data archive import tools.
+- Gmail Takeout import tools.
+- Google Calendar export import tools.
 - Relationship extraction and interpretation models.
 - Optional WhatsApp Web outbound sender.
+- Optional Slack and iMessage outbound senders.
 - A refresh script based on your install-time answers.
 - An optional always-on watch script that can pull every N minutes.
 
@@ -74,6 +77,8 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Import recent iMessage history from the local macOS Messages database.
 - Import Slack workspace exports.
 - Import LinkedIn data archives for connections and messages when available.
+- Import Gmail Takeout `.mbox` exports into email context.
+- Import Google Calendar `.ics` exports into schedule/life context.
 - Build relationship profiles from message patterns.
 - Merge confirmed-looking same-person profiles across sources into a person context index.
 - Infer provisional roles like parent, sibling, family group, work collaborator, close personal contact, or unlabeled contact using contact names, message patterns, and explicit conversation evidence.
@@ -99,9 +104,13 @@ digital-brain doctor
 digital-brain sync-imessage --days 30
 digital-brain import-slack --input ./slack-export.zip
 digital-brain import-linkedin --input ./linkedin-archive.zip
+digital-brain import-gmail --input ./takeout.mbox
+digital-brain import-calendar --input ./calendar.ics
 digital-brain import-repos --input ./codewiser-frontend --input ./codewiser-backend
 digital-brain connect-repos
 digital-brain send-whatsapp --to "Name" --message "text"
+digital-brain send-slack --channel C123 --message "text"
+digital-brain send-imessage --to "+15551234567" --message "text"
 digital-brain auto-whatsapp --allow "Name" --model llama3.1
 digital-brain auto-whatsapp --contact "+15551234567" --model llama3.1
 OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow-all --provider openai --model gpt-4.1-mini --yes

@@ -46,6 +46,16 @@ Slack export access depends on workspace permissions and plan. Public-channel ex
 
 Export guide: https://slack.com/help/articles/201658943-Export-your-workspace-data
 
+### Slack outbound
+
+Digital Brain can send a Slack message through a Slack bot token:
+
+```bash
+SLACK_BOT_TOKEN="xoxb-..." digital-brain send-slack --channel C123 --message "text" --yes
+```
+
+Without `--yes`, the command logs a draft only. The token needs Slack `chat:write` permission and the bot must be in the target channel. This is an outbound primitive, not a full Slack auto-reply loop yet.
+
 ## LinkedIn
 
 Use LinkedIn's official data archive ZIP or extracted archive folder.
@@ -60,10 +70,44 @@ Digital Brain does not scrape LinkedIn or automate the LinkedIn app. LinkedIn co
 
 Data archive guide: https://www.linkedin.com/help/linkedin/answer/a566336
 
+## Gmail
+
+Use Gmail's official Google Takeout export. Digital Brain reads `.mbox` files directly or from a Takeout ZIP/folder.
+
+```bash
+digital-brain import-gmail --input ./takeout.mbox --self-email you@example.com
+digital-brain extract
+digital-brain interpret
+```
+
+Gmail output includes normalized raw email records plus `06 AI Memory/Email Context.md` with active threads, frequent people/domains, and latest snippets. Use `--privacy-mode metadata-only` to omit email bodies from raw records.
+
+Google Takeout: https://takeout.google.com/
+
+## Google Calendar
+
+Use Google Calendar's official `.ics` export from Google Takeout.
+
+```bash
+digital-brain import-calendar --input ./calendar.ics --past-days 365 --future-days 365
+```
+
+Calendar output includes `08 Sources/Google Calendar/Raw/events.jsonl` plus `06 AI Memory/Calendar Context.md` with upcoming/recent events, frequent people, recurring event counts, and schedule context.
+
+Google Takeout: https://takeout.google.com/
+
+## iMessage outbound
+
+Digital Brain can send through the macOS Messages app using AppleScript:
+
+```bash
+digital-brain send-imessage --to "+15551234567" --message "text" --yes
+```
+
+Without `--yes`, the command logs a draft only. This requires macOS, Messages login, and the recipient must be reachable by Messages. This is an outbound primitive, not a full iMessage auto-reply loop yet.
+
 ## Useful Next Sources
 
-- Calendar: recurring people, meetings, and relationship cadence.
-- Email export: long-form relationship and work context, but privacy risk is high.
 - GitHub: collaborators, repos, review style, and work graph.
 - Linear/Jira: active projects and operating context.
 - Contacts: canonical names, phones, companies, and relationship labels.

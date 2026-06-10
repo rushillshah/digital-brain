@@ -37,11 +37,15 @@ async function main() {
   else if (command === "sync-imessage") runPython("digital_brain_imessage_sync.py", argv);
   else if (command === "import-slack") runPython("digital_brain_slack_export_import.py", argv);
   else if (command === "import-linkedin") runPython("digital_brain_linkedin_export_import.py", argv);
+  else if (command === "import-gmail") runPython("digital_brain_gmail_takeout_import.py", argv);
+  else if (command === "import-calendar") runPython("digital_brain_google_calendar_import.py", argv);
   else if (command === "import-repos") runPython("digital_brain_repo_context_import.py", argv);
   else if (command === "connect-repos") await connectRepos(argv, args);
   else if (command === "extract") runPython("digital_brain_relationship_extractor.py", argv);
   else if (command === "interpret") runPython("digital_brain_relationship_interpreter.py", argv);
   else if (command === "send-whatsapp") runNode("whatsapp-web/send.mjs", argv);
+  else if (command === "send-slack") runNode("slack/send.mjs", argv);
+  else if (command === "send-imessage") runNode("imessage/send.mjs", argv);
   else if (command === "auto-whatsapp") runNode("whatsapp-web/auto-reply.mjs", argv);
   else if (command === "pause-whatsapp") pauseWhatsApp(argv, args);
   else if (command === "resume-whatsapp") resumeWhatsApp(argv, args);
@@ -117,6 +121,8 @@ async function init(argv, args) {
       ["imessage", "Apple iMessage", "Live local sync from macOS Messages database.", "💬"],
       ["slack", "Slack export", "Import official Slack workspace export ZIP/folder.", "🧵"],
       ["linkedin", "LinkedIn archive", "Import official LinkedIn data archive ZIP/folder.", "💼"],
+      ["gmail", "Gmail Takeout", "Import official Gmail Takeout .mbox or ZIP.", "📧"],
+      ["calendar", "Google Calendar", "Import official Google Calendar .ics export.", "🗓️"],
       ["repos", "Git repositories", "Index local repo READMEs, manifests, remotes, and recent commits.", "📦"],
     ], selectedSources);
     if (selectedSources.includes("repos")) repoPaths = await configureRepositoryContext(rl, args, repoPaths);
@@ -298,6 +304,8 @@ async function runRefresh(argv, args) {
     if (selectedSources.includes("imessage")) console.log(`  sync iMessage: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
     if (selectedSources.includes("slack")) console.log("  Slack: import-only; run digital-brain import-slack --input <export.zip>");
     if (selectedSources.includes("linkedin")) console.log("  LinkedIn: import-only; run digital-brain import-linkedin --input <archive.zip>");
+    if (selectedSources.includes("gmail")) console.log("  Gmail: import-only; run digital-brain import-gmail --input <takeout.mbox|takeout.zip>");
+    if (selectedSources.includes("calendar")) console.log("  Google Calendar: import-only; run digital-brain import-calendar --input <calendar.ics|takeout.zip>");
     if (selectedSources.includes("repos")) console.log(repoPaths.length ? `  repos: ${repoPaths.length} configured path(s)` : "  repos: no paths configured; run digital-brain import-repos --input <repo>");
     console.log(`  extract relationships: days=${days}`);
     console.log(`  interpret relationship drafts: days=${days}`);
@@ -572,6 +580,22 @@ function printSetupCheck(vault, options = {}) {
       hint: "Export guide: https://www.linkedin.com/help/linkedin/answer/a566336",
     });
   }
+  if (selectedSources.includes("gmail")) {
+    checks.push({
+      label: "Gmail Takeout",
+      ok: true,
+      value: "import manually",
+      hint: "Export guide: https://takeout.google.com/",
+    });
+  }
+  if (selectedSources.includes("calendar")) {
+    checks.push({
+      label: "Google Calendar export",
+      ok: true,
+      value: "import manually",
+      hint: "Export guide: https://takeout.google.com/",
+    });
+  }
 
   console.log("");
   console.log("Setup check");
@@ -602,6 +626,12 @@ function printSetupCheck(vault, options = {}) {
     }
     if (selectedSources.includes("linkedin")) {
       console.log(`  ${step++}. Download a LinkedIn archive, then run: digital-brain import-linkedin --input <archive.zip>`);
+    }
+    if (selectedSources.includes("gmail")) {
+      console.log(`  ${step++}. Download Gmail from Google Takeout, then run: digital-brain import-gmail --input <takeout.mbox|takeout.zip>`);
+    }
+    if (selectedSources.includes("calendar")) {
+      console.log(`  ${step++}. Download Google Calendar from Google Takeout, then run: digital-brain import-calendar --input <calendar.ics|takeout.zip>`);
     }
     console.log(`  ${step++}. Run: digital-brain run`);
     console.log(`  ${step}. Ask your AI to use the generated vault notes for personal context.`);
@@ -1191,11 +1221,15 @@ Usage:
   digital-brain sync-imessage --days 30
   digital-brain import-slack --input slack-export.zip
   digital-brain import-linkedin --input linkedin-archive.zip
+  digital-brain import-gmail --input takeout.mbox
+  digital-brain import-calendar --input calendar.ics
   digital-brain import-repos --input /path/to/repo --input /path/to/another-repo
   digital-brain connect-repos
   digital-brain extract --days 30
   digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]
+  digital-brain send-slack --channel C123 --message "Text" [--yes]
+  digital-brain send-imessage --to "+15551234567" --message "Text" [--yes]
   digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|anthropic|xai|codex|codex-app --model llama3.1 [--reply-style-mode match-user|casual-imperfect|clean-formal] [--yes]
   digital-brain pause-whatsapp [--chat "Name"]
   digital-brain resume-whatsapp [--chat "Name"]
