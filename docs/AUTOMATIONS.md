@@ -167,7 +167,7 @@ Guardrails:
 - processes unread chats on startup unless `--no-process-unread` is passed
 - skips groups unless `--include-groups` is passed
 - uses a per-chat cooldown, default 20 minutes
-- caps replies per chat per run, default 5
+- no reply cap by default, so conversations can continue naturally; pass `--max-replies-per-chat <n>` to add one
 - logs metadata by default, not full sent text
 - enforces the AI disclosure rule after repeated AI-assisted sends, but does not repeat it after that chat has already received a disclosure
 

@@ -39,7 +39,7 @@ const includeBusinesses = Boolean(args["include-businesses"]);
 const sendEnabled = Boolean(args.yes) || config.outboundMode === "auto-send";
 const processUnreadOnStart = !Boolean(args["no-process-unread"]);
 const cooldownMinutes = numberArg("cooldown-minutes", 20);
-const maxRepliesPerChat = numberArg("max-replies-per-chat", 5);
+const maxRepliesPerChat = numberArg("max-replies-per-chat", 0);
 const maxContextChars = numberArg("max-context-chars", 12000);
 const outboundLogMode = args["log-mode"] || config.outboundLogMode || "metadata";
 const state = loadState();
@@ -88,6 +88,7 @@ client.on("ready", async () => {
   if (provider === "codex") console.log(`Codex command: ${codexCommand}`);
   if (provider === "codex-app") console.log(`Codex App bridge: ${codexAppBridgeDir}`);
   if (!includeBusinesses) console.log("Likely business, notification, OTP, and service chats are skipped by default.");
+  console.log(maxRepliesPerChat > 0 ? `Reply cap: ${maxRepliesPerChat} per chat per run.` : "Reply cap: unlimited.");
   try {
     if (processUnreadOnStart) {
       await processUnreadChats();
@@ -129,7 +130,7 @@ async function processUnreadChats() {
       console.log(`Skipping unread chat during cooldown: ${name}`);
       continue;
     }
-    if (replyCount(name) >= maxRepliesPerChat) {
+    if (isAtReplyCap(name)) {
       console.log(`Skipping unread chat at reply cap: ${name}`);
       continue;
     }
@@ -245,7 +246,7 @@ async function handleMessage(message, knownChat = null) {
     console.log(`Skipping chat during cooldown: ${name}`);
     return;
   }
-  if (replyCount(name) >= maxRepliesPerChat) {
+  if (isAtReplyCap(name)) {
     console.log(`Skipping chat at reply cap: ${name}`);
     return;
   }
@@ -684,6 +685,10 @@ function isCoolingDown(name) {
 
 function replyCount(name) {
   return state.sentCountByChat[name] || 0;
+}
+
+function isAtReplyCap(name) {
+  return maxRepliesPerChat > 0 && replyCount(name) >= maxRepliesPerChat;
 }
 
 function markProcessed(message, name, options = { sent: true }) {
