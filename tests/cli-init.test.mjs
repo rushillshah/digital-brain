@@ -56,6 +56,10 @@ test("init writes configured vault files and scripts", () => {
   assert.equal(config.responsibilityAccepted, true);
   assert.equal(config.defaults.minimumRefreshIntervalMinutes, 1);
   assert.equal(config.disclosureRule.discloseAfterAiAssistedSends, 2);
+  if (process.platform !== "win32") {
+    const mode = fs.statSync(path.join(vault, "digital-brain.config.json")).mode & 0o777;
+    assert.equal(mode, 0o600);
+  }
 
   assert.match(read(path.join(vault, "Tools", "digital-brain-refresh.sh")), /--days "\$DAYS"/);
   assert.match(read(path.join(vault, "Tools", "digital-brain-refresh.sh")), /digital-brain run/);
@@ -490,6 +494,8 @@ test("whatsapp web desktop sync is wired as a cross-platform source", () => {
   assert.match(syncSource, /WhatsApp Web\/Desktop linked device/);
   assert.match(syncSource, /limit-per-chat/);
   assert.match(syncSource, /web-seen-message-ids\.json/);
+  assert.match(syncSource, /args: browserArgs\(\)/);
+  assert.match(syncSource, /DIGITAL_BRAIN_CHROME_NO_SANDBOX/);
   assert.match(desktopSource, /whatsapp-web/);
 });
 
@@ -541,6 +547,11 @@ test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", ()
   assert.match(source, /XAI_API_KEY/);
   assert.match(source, /https:\/\/api\.anthropic\.com\/v1\/messages/);
   assert.match(source, /https:\/\/api\.x\.ai\/v1\/responses/);
+  assert.match(source, /shell: false/);
+  assert.match(source, /splitCommand/);
+  assert.match(source, /args: browserArgs\(\)/);
+  assert.match(source, /DIGITAL_BRAIN_CHROME_NO_SANDBOX/);
+  assert.doesNotMatch(source, /shell: true/);
 });
 
 test("auto-reply allows explicitly whitelisted groups by name", () => {
@@ -837,6 +848,23 @@ test("extract skips corrupt JSONL and keeps valid records", () => {
   assert.ok(profiles.some((profile) => profile.chatName === "Corrupt Test"));
 });
 
+test("importers reject unsafe zip member paths", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const archive = path.join(root, "unsafe-slack.zip");
+  const outside = path.join(root, "evil.json");
+  createZip(archive, {
+    "users.json": "[]",
+    "../evil.json": "[]",
+  });
+
+  const result = runRaw([cli, "import-slack", "--vault", vault, "--input", archive], { HOME: testHome(root) });
+
+  assert.notEqual(result.status, 0);
+  assert.match(`${result.stdout}\n${result.stderr}`, /Unsafe archive member path|escapes destination/);
+  assert.equal(fs.existsSync(outside), false);
+});
+
 test("sync-imessage imports from a local Messages-style database", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
@@ -955,5 +983,19 @@ conn.commit()
 conn.close()
 `;
   const result = spawnSync("python3", ["-c", code, db], { encoding: "utf8" });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+}
+
+function createZip(file, entries) {
+  const payload = Buffer.from(JSON.stringify(entries), "utf8").toString("base64");
+  const code = `
+import base64, json, sys, zipfile
+file = sys.argv[1]
+entries = json.loads(base64.b64decode(sys.argv[2]).decode())
+with zipfile.ZipFile(file, "w") as archive:
+    for name, content in entries.items():
+        archive.writestr(name, content)
+`;
+  const result = spawnSync("python3", ["-c", code, file, payload], { encoding: "utf8" });
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 }

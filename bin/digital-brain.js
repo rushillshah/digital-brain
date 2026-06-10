@@ -674,7 +674,9 @@ function printSetupCheck(vault, options = {}) {
 }
 
 function writeConfig(vault, config) {
-  writeFileAtomic(path.join(vault, "digital-brain.config.json"), `${JSON.stringify(config, null, 2)}\n`);
+  const configPath = path.join(vault, "digital-brain.config.json");
+  writeFileAtomic(configPath, `${JSON.stringify(config, null, 2)}\n`);
+  chmodOwnerOnly(configPath);
 }
 
 function writeRefreshScript(vault, config) {
@@ -782,6 +784,15 @@ function writeFileAtomic(file, content) {
   const temp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(temp, content);
   fs.renameSync(temp, file);
+}
+
+function chmodOwnerOnly(file) {
+  if (process.platform === "win32") return;
+  try {
+    fs.chmodSync(file, 0o600);
+  } catch {
+    // Best effort only: some filesystems do not support POSIX modes.
+  }
 }
 
 function printSetupHeader(defaultVault) {

@@ -34,7 +34,7 @@ const client = new Client({
   authStrategy: new LocalAuth({ clientId: "digital-brain", dataPath: sessionDir }),
   puppeteer: {
     headless,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    args: browserArgs(),
   },
 });
 
@@ -174,6 +174,12 @@ function parseArgs(argv) {
     else if (arg.startsWith("--")) out[arg.slice(2)] = argv[++i] || "";
   }
   return out;
+}
+
+function browserArgs() {
+  return process.env.DIGITAL_BRAIN_CHROME_NO_SANDBOX === "1"
+    ? ["--no-sandbox", "--disable-setuid-sandbox"]
+    : [];
 }
 
 function usage() {

@@ -93,7 +93,7 @@ if (provider === "ollama") {
 
 const client = new Client({
   authStrategy: new LocalAuth({ clientId: "digital-brain", dataPath: sessionDir }),
-  puppeteer: { headless: false, args: ["--no-sandbox", "--disable-setuid-sandbox"] },
+  puppeteer: { headless: false, args: browserArgs() },
 });
 
 client.on("qr", (qr) => {
@@ -742,9 +742,11 @@ async function runReplyCommand(command, prompt, label) {
   const usesPromptFile = command.includes("{promptFile}");
   const promptFile = usesPromptFile ? path.join(outboundDir, `reply-prompt-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`) : "";
   if (promptFile) fs.writeFileSync(promptFile, prompt, "utf8");
-  const renderedCommand = promptFile ? command.replaceAll("{promptFile}", shellQuote(promptFile)) : command;
+  const commandParts = splitCommand(command).map((part) => promptFile ? part.replaceAll("{promptFile}", promptFile) : part);
+  if (!commandParts.length) throw new Error(`${label} reply command is empty`);
+  const [executable, ...commandArgs] = commandParts;
   return await new Promise((resolve, reject) => {
-    const child = spawn(renderedCommand, { shell: true, cwd: vault, env: process.env });
+    const child = spawn(executable, commandArgs, { shell: false, cwd: vault, env: process.env });
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => {
@@ -1273,8 +1275,35 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function shellQuote(value) {
-  return `'${String(value).replaceAll("'", "'\\''")}'`;
+function splitCommand(command) {
+  const out = [];
+  let current = "";
+  let quote = "";
+  let escaped = false;
+  for (const char of String(command || "")) {
+    if (escaped) {
+      current += char;
+      escaped = false;
+    } else if (char === "\\") {
+      escaped = true;
+    } else if (quote) {
+      if (char === quote) quote = "";
+      else current += char;
+    } else if (char === "'" || char === '"') {
+      quote = char;
+    } else if (/\s/.test(char)) {
+      if (current) {
+        out.push(current);
+        current = "";
+      }
+    } else {
+      current += char;
+    }
+  }
+  if (escaped) current += "\\";
+  if (quote) throw new Error("Codex command contains an unterminated quote");
+  if (current) out.push(current);
+  return out;
 }
 
 async function shutdown(code) {
@@ -1344,4 +1373,10 @@ function parseArgs(argv) {
 function usage() {
   console.error('Usage: digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|codex|codex-app --model llama3.1 [--yes] [--allow-all] [--include-groups] [--include-businesses]');
   process.exit(1);
+}
+
+function browserArgs() {
+  return process.env.DIGITAL_BRAIN_CHROME_NO_SANDBOX === "1"
+    ? ["--no-sandbox", "--disable-setuid-sandbox"]
+    : [];
 }

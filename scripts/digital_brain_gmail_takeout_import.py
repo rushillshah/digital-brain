@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from email.header import decode_header
 from email.utils import getaddresses, parsedate_to_datetime
 from pathlib import Path
+from digital_brain_safe_zip import safe_extract_zip
 
 
 def main():
@@ -288,7 +289,7 @@ def unpack(input_path):
         return NullContext(input_path)
     temp = tempfile.TemporaryDirectory()
     with zipfile.ZipFile(input_path) as archive:
-        archive.extractall(temp.name)
+        safe_extract_zip(archive, temp.name)
     return TempContext(Path(temp.name), temp)
 
 

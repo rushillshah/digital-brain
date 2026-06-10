@@ -10,6 +10,8 @@ Digital Brain is designed for local use.
 - WhatsApp auto-reply uses local Ollama by default, a configured local Codex command, or a Codex desktop file bridge. It runs only while the command is active and requires an allowlist unless explicitly overridden. If init is configured for auto-send mode, it can send without `--yes`.
 - Raw source data stays under `08 Sources/`; normal AI context should use `06 AI Memory/` and human notes under `04 People/`.
 - Same-person matching across sources is provisional and file-based; keep source evidence visible when using merged person context.
+- ZIP imports are extracted through path validation to reject archive traversal.
+- On POSIX systems, `digital-brain.config.json` and the global default-vault config are written owner-readable/writeable only where supported.
 
 Things to be careful about:
 
@@ -21,5 +23,6 @@ Things to be careful about:
 - Treat Microsoft Teams exports and Graph sends as tenant-permissioned data; only import/send data you are authorized to access.
 - Slack and Microsoft Teams exports may include workplace metadata such as titles, departments, companies, and email domains. Digital Brain keeps this local and uses it only for source-specific relationship context.
 - Always-on mode runs on your machine and inherits your local permissions.
+- Set `DIGITAL_BRAIN_CHROME_NO_SANDBOX=1` only if Chromium cannot launch otherwise; leaving the browser sandbox on is the safer default.
 - You are responsible for consent, privacy, message content, and sends made from your machine.
 - Treat relationship labels as editable working notes, not truth.
