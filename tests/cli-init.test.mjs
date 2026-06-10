@@ -535,6 +535,16 @@ test("import-repos writes project context from local repositories", () => {
   assert.equal(records[0].name, "codewiser-frontend");
 });
 
+test("init supports GitHub CLI repository onboarding", () => {
+  const source = read(path.join(repo, "bin", "digital-brain.js"));
+  assert.match(source, /Connect GitHub/);
+  assert.match(source, /gh auth login --web/);
+  assert.match(source, /ghIsAuthenticated/);
+  assert.match(source, /"repo", "list"/);
+  assert.match(source, /cloneOrPullRepo/);
+  assert.match(source, /\.digital-brain", "github-repos"/);
+});
+
 test("extract skips corrupt JSONL and keeps valid records", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");

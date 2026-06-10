@@ -34,6 +34,7 @@ digital-brain run
 - WhatsApp auto-reply provider: Ollama, OpenAI API, Anthropic API, xAI API, Codex app bridge, or Codex CLI
 - AI reply style: match learned style, casual imperfect, or clean/formal
 - optional local Git repositories for project context
+- optional GitHub CLI connection for selecting and cloning/pulling allowed repositories
 - whether to add AI adapter pointers
 
 Most questions are multiple choice. Pick with `A/B/C`, `1/2/3`, the exact value, or press Enter to use the displayed default.
@@ -103,9 +104,12 @@ The generated script loops forever and sleeps for `refreshIntervalMinutes`. The 
 Use repository context when you want the vault to know what projects you are actively building without copying entire source trees into Obsidian.
 
 ```bash
+gh auth login --web
 digital-brain import-repos --input /path/to/codewiser-frontend --input /path/to/codewiser-backend
 digital-brain run --sources repos --repo-paths "/path/to/codewiser-frontend,/path/to/codewiser-backend"
 ```
+
+During `digital-brain init`, select `Git repositories`, then choose `Connect GitHub`. Digital Brain uses the GitHub CLI (`gh`) for authentication, lists repositories for the owner/org you choose, asks which repos are allowed, and clones or pulls only those repos into `~/.digital-brain/github-repos`.
 
 The importer reads READMEs, common manifests such as `package.json` and `pyproject.toml`, git remotes, current branches, recent commit messages, and top-level file names. It writes `06 AI Memory/Project Context.md` for AI context and detailed generated notes under `08 Sources/Repositories`.
 

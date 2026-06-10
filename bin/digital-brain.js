@@ -115,10 +115,7 @@ async function init(argv, args) {
       ["linkedin", "LinkedIn archive", "Import official LinkedIn data archive ZIP/folder.", "💼"],
       ["repos", "Git repositories", "Index local repo READMEs, manifests, remotes, and recent commits.", "📦"],
     ], selectedSources);
-    if (selectedSources.includes("repos")) {
-      const answer = await ask(rl, "📦 Repository paths", repoPaths.join(", "), "Comma-separated local repo folders. You can leave blank and run import-repos later.");
-      repoPaths = parseList(answer);
-    }
+    if (selectedSources.includes("repos")) repoPaths = await configureRepositoryContext(rl, args, repoPaths);
     privacyMode = await select(rl, "Privacy mode", [
       ["standard", "Standard", "Keep raw JSONL locally for analysis, but do not generate raw chat Markdown.", "🔐"],
       ["metadata-only", "Metadata only", "Store timestamps and participants, but omit message bodies.", "🧼"],
@@ -397,6 +394,7 @@ function printSetupCheck(vault, options = {}) {
   const pythonVersion = shell("python3", ["--version"], true);
   const pythonSqlite = shell("python3", ["-c", "import sqlite3; print('ok')"], true);
   const ollamaVersion = shell("ollama", ["--version"], true);
+  const ghVersion = shell("gh", ["--version"], true);
   const macDb = path.join(os.homedir(), "Library/Group Containers/group.net.whatsapp.WhatsApp.shared/ChatStorage.sqlite");
   const messagesDb = path.join(os.homedir(), "Library/Messages/chat.db");
   const checks = [
@@ -469,6 +467,22 @@ function printSetupCheck(vault, options = {}) {
       ok: fs.existsSync(messagesDb),
       value: fs.existsSync(messagesDb) ? "found" : "not found yet",
       hint: "Open Messages on macOS and grant Terminal Full Disk Access if needed: https://support.apple.com/guide/messages/welcome/mac",
+    });
+  }
+  if (selectedSources.includes("repos")) {
+    checks.push({
+      label: "GitHub CLI",
+      ok: Boolean(ghVersion),
+      value: ghVersion || "optional",
+      hint: "Install with: brew install gh. Required only for GitHub repo selection during init.",
+      optional: true,
+    });
+    checks.push({
+      label: "Configured repositories",
+      ok: Boolean((config.repoPaths || []).length),
+      value: (config.repoPaths || []).length ? `${config.repoPaths.length} path(s)` : "none configured yet",
+      hint: "Run init with repos selected or run import-repos --input /path/to/repo.",
+      optional: true,
     });
   }
   if (selectedSources.includes("slack")) {
@@ -728,6 +742,109 @@ async function responsibilityGate(rl, { schedule, outboundMode }) {
   console.log("  You are responsible for consent, privacy, message content, and any sends triggered from this machine.");
   console.log("  Enter does not approve this mode.");
   return confirm(rl, "I understand and want this mode enabled", false);
+}
+
+async function configureRepositoryContext(rl, args, existingRepoPaths) {
+  const mode = await select(rl, "Repository context setup", [
+    ["github", "Connect GitHub", "Use GitHub CLI auth, pick allowed repos, then clone/pull them locally.", "🐙"],
+    ["local", "Local paths", "Paste comma-separated local repo folders.", "📁"],
+    ["later", "Later", "Skip now and run import-repos later.", "⏭️"],
+  ], args["github-connect"] === "false" ? "local" : "github");
+
+  if (mode === "later") return existingRepoPaths;
+  if (mode === "local") {
+    const answer = await ask(rl, "📦 Repository paths", existingRepoPaths.join(", "), "Comma-separated local repo folders. You can leave blank and run import-repos later.");
+    return parseList(answer);
+  }
+
+  if (!commandExists("gh")) {
+    console.log("GitHub CLI was not found. Install it with: brew install gh");
+    const answer = await ask(rl, "📦 Repository paths", existingRepoPaths.join(", "), "Fallback: comma-separated local repo folders.");
+    return parseList(answer);
+  }
+
+  if (!ghIsAuthenticated()) {
+    console.log("GitHub CLI is not authenticated.");
+    if (await confirm(rl, "Run `gh auth login --web` now?", true)) {
+      const result = spawnSync("gh", ["auth", "login", "--web"], { stdio: "inherit" });
+      if ((result.status ?? 1) !== 0 || !ghIsAuthenticated()) {
+        console.log("GitHub authentication did not complete. You can run `gh auth login --web` later.");
+        return existingRepoPaths;
+      }
+    } else {
+      return existingRepoPaths;
+    }
+  }
+
+  const login = ghOutput(["api", "user", "--jq", ".login"]);
+  const ownersAnswer = await ask(rl, "🐙 GitHub owner/org", login || "", "Comma-separated. Example: your username, codewiser-io.");
+  const owners = parseList(ownersAnswer || login);
+  const repos = owners.flatMap((owner) => listGithubRepos(owner, Number(args["github-repo-limit"] || 100)));
+  if (!repos.length) {
+    console.log("No GitHub repositories found for the selected owner/org.");
+    return existingRepoPaths;
+  }
+
+  const selected = await multiSelect(
+    rl,
+    "Repositories to pull into context",
+    repos.map((repo) => [repo.nameWithOwner, repo.nameWithOwner, repo.description || repo.visibility || "GitHub repository", repo.isPrivate ? "🔒" : "📦"]),
+    repos.slice(0, Math.min(repos.length, 5)).map((repo) => repo.nameWithOwner),
+  );
+  const cloneRoot = path.resolve(args["repo-clone-dir"] || path.join(os.homedir(), ".digital-brain", "github-repos"));
+  ensureDir(cloneRoot);
+  const paths = [];
+  for (const nameWithOwner of selected) {
+    const repo = repos.find((item) => item.nameWithOwner === nameWithOwner);
+    if (!repo) continue;
+    const localPath = cloneOrPullRepo(repo, cloneRoot);
+    if (localPath) paths.push(localPath);
+  }
+  return paths.length ? paths : existingRepoPaths;
+}
+
+function commandExists(command) {
+  const result = spawnSync(command, ["--version"], { encoding: "utf8" });
+  return !result.error && (result.status ?? 1) === 0;
+}
+
+function ghIsAuthenticated() {
+  const result = spawnSync("gh", ["auth", "status"], { encoding: "utf8" });
+  return !result.error && (result.status ?? 1) === 0;
+}
+
+function ghOutput(args) {
+  const result = spawnSync("gh", args, { encoding: "utf8" });
+  if (result.error || (result.status ?? 1) !== 0) return "";
+  return result.stdout.trim();
+}
+
+function listGithubRepos(owner, limit) {
+  const output = ghOutput(["repo", "list", owner, "--limit", String(limit || 100), "--json", "nameWithOwner,url,description,isPrivate"]);
+  if (!output) return [];
+  try {
+    return JSON.parse(output).map((repo) => ({
+      nameWithOwner: repo.nameWithOwner,
+      url: repo.url,
+      description: repo.description || "",
+      isPrivate: Boolean(repo.isPrivate),
+      visibility: repo.isPrivate ? "private" : "public",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function cloneOrPullRepo(repo, cloneRoot) {
+  const localPath = path.join(cloneRoot, repo.nameWithOwner.replace("/", "__"));
+  if (fs.existsSync(path.join(localPath, ".git"))) {
+    console.log(`Pulling ${repo.nameWithOwner}...`);
+    const result = spawnSync("git", ["-C", localPath, "pull", "--ff-only"], { stdio: "inherit" });
+    return (result.status ?? 1) === 0 ? localPath : "";
+  }
+  console.log(`Cloning ${repo.nameWithOwner}...`);
+  const result = spawnSync("gh", ["repo", "clone", repo.nameWithOwner, localPath], { stdio: "inherit" });
+  return (result.status ?? 1) === 0 ? localPath : "";
 }
 
 function needsResponsibilityGate({ schedule, outboundMode }) {
