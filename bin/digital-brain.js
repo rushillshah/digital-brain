@@ -49,6 +49,7 @@ async function init(argv, args) {
   let activeWindow = args["active-window"] || "08:00-12:00";
   let timezone = args.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
   let outboundMode = args["outbound-mode"] || "draft";
+  let autoReplyProvider = args["auto-reply-provider"] || args.provider || "ollama";
   let privacyMode = args["privacy-mode"] || "standard";
   let sourceMarkdownMode = args["source-markdown-mode"] || "none";
   let selectedSources = parseList(args.sources || "whatsapp");
@@ -105,6 +106,13 @@ async function init(argv, args) {
       ["send-with-confirmation", "Send with confirmation", "Can send only after explicit command confirmation.", "✅"],
       ["auto-send", "Auto-send while running", "Lets auto-whatsapp send from allowlisted chats while it is running.", "🚦"],
     ], outboundMode);
+    if (outboundMode !== "disabled") {
+      autoReplyProvider = await select(rl, "WhatsApp auto-reply brain", [
+        ["ollama", "Ollama local model", "Runs fully local if Ollama and the model are installed.", "🦙"],
+        ["codex-app", "Codex app bridge", "Uses request/response files for a Codex desktop automation or thread.", "🧠"],
+        ["codex", "Codex CLI", "Uses a local codex command; only choose this if the CLI works.", "⌨️"],
+      ], autoReplyProvider);
+    }
     connectAi = await confirm(rl, "🔗 Add global AI pointers for Codex/Claude/Gemini?", true);
     responsibilityAccepted = await responsibilityGate(rl, { schedule, outboundMode });
     if (!responsibilityAccepted && needsResponsibilityGate({ schedule, outboundMode })) {
@@ -132,6 +140,7 @@ async function init(argv, args) {
     activeWindow,
     timezone,
     outboundMode,
+    autoReplyProvider,
     privacyMode,
     sourceMarkdownMode,
     selectedSources,
@@ -154,6 +163,7 @@ async function init(argv, args) {
   writeDefaultVault(vault);
   writeRefreshScript(vault, config);
   writeWatchScript(vault, config);
+  writeCodexAppBridgeGuide(vault, config);
 
   if (connectAi) {
     addGlobalPointer(path.join(os.homedir(), ".codex", "AGENTS.md"), vault, "Codex");
@@ -166,6 +176,14 @@ async function init(argv, args) {
   console.log(`Default vault saved: ${vault}`);
   console.log(`Refresh script: ${path.join(vault, "Tools", "digital-brain-refresh.sh")}`);
   console.log(`Always-on script: ${path.join(vault, "Tools", "digital-brain-watch.sh")}`);
+  if (autoReplyProvider === "codex-app") {
+    console.log(`Codex app bridge guide: ${path.join(vault, "Tools", "Codex App Bridge Automation.md")}`);
+    if (codexAppLooksAvailable()) {
+      console.log("Codex app detected. Add the generated bridge prompt as a Codex automation/thread to answer WhatsApp reply requests.");
+    } else {
+      console.log("Codex app config was not detected. The bridge guide was still generated for later use.");
+    }
+  }
   console.log("Next:");
   console.log("  digital-brain run");
   if (schedule === "always-on") console.log(`  "${path.join(vault, "Tools", "digital-brain-watch.sh")}"`);
@@ -408,6 +426,48 @@ done
   fs.chmodSync(scriptPath, 0o755);
 }
 
+function writeCodexAppBridgeGuide(vault, config) {
+  const toolsDir = path.join(vault, "Tools");
+  ensureDir(toolsDir);
+  const bridgeDir = path.join(vault, "08 Sources", "WhatsApp", "Outbound", "Codex App Bridge");
+  const requestsDir = path.join(bridgeDir, "requests");
+  const responsesDir = path.join(bridgeDir, "responses");
+  ensureDir(requestsDir);
+  ensureDir(responsesDir);
+  const prompt = `# Codex App Bridge Automation
+
+Use this prompt in a Codex desktop automation or a live Codex thread when Digital Brain is configured with:
+
+\`\`\`bash
+digital-brain auto-whatsapp --provider codex-app --yes
+\`\`\`
+
+Request folder:
+
+\`${requestsDir}\`
+
+Response folder:
+
+\`${responsesDir}\`
+
+Automation prompt:
+
+\`\`\`text
+Check for pending Digital Brain WhatsApp reply requests in ${requestsDir}. For each .json request that does not already have its response file present, read the request JSON, use its prompt field to produce exactly one WhatsApp reply as the user, and write JSON to the request's responsePath in the exact shape {"reply":"..."}. Do not send any WhatsApp message yourself. Do not write markdown or explanations in the response file. If a request cannot be answered, write {"error":"short reason"} to responsePath.
+\`\`\`
+
+Notes:
+
+- Digital Brain sends the WhatsApp message after the response file appears.
+- Keep the automation active while \`digital-brain auto-whatsapp --provider codex-app\` is running.
+- The default wait timeout is 5 minutes. Override with \`--provider-timeout-ms\`.
+`;
+  writeFileAtomic(path.join(toolsDir, "Codex App Bridge Automation.md"), prompt);
+  if (config.autoReplyProvider === "codex-app") {
+    writeFileAtomic(path.join(bridgeDir, "README.md"), prompt);
+  }
+}
+
 function addGlobalPointer(file, vault, label) {
   ensureDir(path.dirname(file));
   const block = `
@@ -520,6 +580,10 @@ async function responsibilityGate(rl, { schedule, outboundMode }) {
 
 function needsResponsibilityGate({ schedule, outboundMode }) {
   return schedule === "always-on" || ["send-with-confirmation", "auto-send"].includes(outboundMode);
+}
+
+function codexAppLooksAvailable() {
+  return fs.existsSync(path.join(os.homedir(), ".codex"));
 }
 
 function letterFor(index) {

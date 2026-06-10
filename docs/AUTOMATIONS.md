@@ -31,6 +31,7 @@ digital-brain run
 - refresh interval in minutes for always-on mode, clamped to a minimum of 1
 - active time window
 - WhatsApp outbound mode
+- WhatsApp auto-reply provider: Ollama, Codex app bridge, or Codex CLI
 - whether to add AI adapter pointers
 
 Most questions are multiple choice. Pick with `A/B/C`, `1/2/3`, the exact value, or press Enter to use the displayed default.
@@ -45,6 +46,7 @@ Important defaults:
 - skipped always-on interval uses 5 minutes, with a hard minimum of 1 minute
 - skipped active window uses `08:00-12:00`
 - skipped outbound mode uses draft-only
+- skipped auto-reply provider uses Ollama
 - auto-send mode can be selected during init, but only after the responsibility check
 - skipped AI pointers are added during the guided quiz
 
@@ -138,6 +140,8 @@ digital-brain auto-whatsapp --allow "Mom" --provider codex --codex-command "code
 `--provider codex` runs a local Codex command. If `--codex-command` contains `{promptFile}`, Digital Brain writes the prompt to a temp file and substitutes the path; otherwise it pipes the prompt to stdin.
 
 `--provider codex-app` does not use the Codex CLI. It writes request JSON files to `08 Sources/WhatsApp/Outbound/Codex App Bridge/requests` and waits for response JSON files in `responses`. A Codex desktop automation or live Codex thread must process those request files and write `{"reply":"..."}` to the provided `responsePath`.
+
+When `codex-app` is selected during `init`, Digital Brain creates `Tools/Codex App Bridge Automation.md` with the exact Codex automation prompt and bridge folder paths.
 
 If you selected `Auto-send while running` during init, `auto-whatsapp` can send without `--yes` while it is running:
 

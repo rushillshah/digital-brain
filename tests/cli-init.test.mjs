@@ -43,6 +43,7 @@ test("init writes configured vault files and scripts", () => {
   assert.equal(config.refreshIntervalMinutes, 5);
   assert.equal(config.activeWindow, "08:00-12:00");
   assert.equal(config.outboundMode, "draft");
+  assert.equal(config.autoReplyProvider, "ollama");
   assert.deepEqual(config.selectedSources, ["whatsapp"]);
   assert.equal(config.privacyMode, "standard");
   assert.equal(config.sourceMarkdownMode, "none");
@@ -56,6 +57,7 @@ test("init writes configured vault files and scripts", () => {
   assert.match(read(path.join(vault, "Tools", "digital-brain-refresh.sh")), /--days "\$DAYS"/);
   assert.match(read(path.join(vault, "Tools", "digital-brain-refresh.sh")), /digital-brain run/);
   assert.match(read(path.join(vault, "Tools", "digital-brain-watch.sh")), /INTERVAL_MINUTES="5"/);
+  assert.match(read(path.join(vault, "Tools", "Codex App Bridge Automation.md")), /Codex App Bridge Automation/);
   assert.equal(readJson(path.join(home, ".digital-brain", "config.json")).defaultVault, vault);
   assert.ok(fs.existsSync(path.join(vault, "AGENTS.md")));
   assert.ok(fs.existsSync(path.join(vault, "CLAUDE.md")));
@@ -71,6 +73,7 @@ test("init without a vault path creates the default vault in cwd", () => {
   assert.equal(config.defaults.skippedVaultCreates, vault);
   assert.equal(config.schedule, "manual");
   assert.equal(config.outboundMode, "draft");
+  assert.equal(config.autoReplyProvider, "ollama");
 });
 
 test("full-auto init configures always-on local refresh", () => {
@@ -103,6 +106,26 @@ test("init can configure WhatsApp auto-send mode explicitly", () => {
   const config = readJson(path.join(vault, "digital-brain.config.json"));
   assert.equal(config.outboundMode, "auto-send");
   assert.equal(config.responsibilityAccepted, true);
+});
+
+test("init can configure Codex app auto-reply provider", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  run([
+    cli,
+    "init",
+    vault,
+    "--yes",
+    "--auto-reply-provider",
+    "codex-app",
+    "--connect-ai=false",
+  ], { HOME: testHome(root) });
+
+  const config = readJson(path.join(vault, "digital-brain.config.json"));
+  assert.equal(config.autoReplyProvider, "codex-app");
+  assert.match(read(path.join(vault, "Tools", "Codex App Bridge Automation.md")), /responsePath/);
+  assert.ok(fs.existsSync(path.join(vault, "08 Sources", "WhatsApp", "Outbound", "Codex App Bridge", "requests")));
+  assert.ok(fs.existsSync(path.join(vault, "08 Sources", "WhatsApp", "Outbound", "Codex App Bridge", "responses")));
 });
 
 test("noninteractive auto-send init requires responsibility acceptance", () => {

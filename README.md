@@ -84,6 +84,7 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 - Create AI-readable memory files for future prompts.
 - Draft WhatsApp sends by default, send with explicit `--yes`, or configure auto-send mode during init.
 - Run an explicit WhatsApp auto-responder that uses Ollama or a Codex command plus vault memory while the command is running.
+- Choose the WhatsApp auto-reply provider during init: Ollama, Codex app bridge, or Codex CLI.
 - Enforce an AI-disclosure guard after repeated AI-assisted sends.
 
 ## Core Commands
@@ -149,6 +150,8 @@ digital-brain auto-whatsapp --allow-all --provider codex-app --yes
 ```
 
 Digital Brain writes requests to `08 Sources/WhatsApp/Outbound/Codex App Bridge/requests` and waits for matching JSON responses in `responses`.
+
+If you select `Codex app bridge` during `digital-brain init`, the vault also gets `Tools/Codex App Bridge Automation.md` with the exact prompt to use in the Codex app.
 
 If Digital Brain has already sent two AI-assisted messages to the same chat in the last 24 hours, the next send must disclose that AI is helping. Once that chat has received an AI disclosure, Digital Brain will not keep repeating it.
 
