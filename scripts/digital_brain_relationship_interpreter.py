@@ -32,7 +32,7 @@ def main():
     overrides = load_overrides(sources)
     out_dir = analysis / "Interpreted"
     legacy_out_dir = whatsapp / "Analysis" / "Interpreted"
-    drafts_dir = vault / "06 AI Memory" / "Generated Relationship Drafts"
+    drafts_dir = vault / "04 People" / "Generated"
     out_dir.mkdir(parents=True, exist_ok=True)
     legacy_out_dir.mkdir(parents=True, exist_ok=True)
     drafts_dir.mkdir(parents=True, exist_ok=True)
@@ -183,6 +183,8 @@ Generated draft, not truth. These are private working notes. Edit them where wro
 ## Role / Relationship Label
 - {model['role']} ({model['roleConfidence']} confidence).
 - Reason: {model['roleReason']}.
+- Relationship guess: {model.get('relationshipGuess', 'unlabeled')} ({model.get('relationshipGuessConfidence', 'low')} confidence).
+- Guess reason: {model.get('relationshipGuessReason', 'no reason recorded')}.
 {manual_note(model)}
 
 ## Closeness And Importance

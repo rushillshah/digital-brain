@@ -14,7 +14,7 @@ const DEFAULT_PROVIDER_MODELS = {
   anthropic: "claude-sonnet-4-6",
   xai: "grok-4.3",
 };
-const SUPPORTED_PROVIDERS = ["ollama", "openai", "anthropic", "xai", "codex", "codex-app"];
+const SUPPORTED_PROVIDERS = ["ollama", "openai", "anthropic", "xai", "xci", "codex", "codex-app"];
 const BUSINESS_NAME_RE = /\b(amazon|flipkart|myntra|nykaa|swiggy|zomato|blinkit|zepto|uber|ola|rapido|delivery|courier|dunzo|paytm|phonepe|gpay|google pay|hdfc|icici|sbi|axis|kotak|amex|bank|airtel|jio|vodafone|vi|support|helpdesk|customer care|official|verified|business|meta ai|whatsapp|no[\s-]?reply|noreply|otp|login|security|alerts?|notifications?|offers?|promo|marketing)\b/i;
 const BUSINESS_BODY_RE = /\b(otp|one time password|verification code|login code|security code|do not share|order|delivered|delivery|shipment|tracking|invoice|payment|transaction|debited|credited|refund|ticket|support|unsubscribe|offer|coupon|sale|valid till|automated message)\b/i;
 const args = parseArgs(process.argv.slice(2));
@@ -30,13 +30,13 @@ const whitelistPath = path.join(outboundDir, "auto-reply-whitelist.json");
 const pausePath = path.join(outboundDir, "auto-reply-pause.json");
 const codexAppBridgeDir = path.join(outboundDir, "Codex App Bridge");
 const config = readConfig(vault);
-const provider = args.provider || config.autoReplyProvider || "ollama";
+const provider = normalizeProvider(args.provider || config.autoReplyProvider || "ollama");
 const model = args.model || config.autoReplyModel || defaultModelForProvider(provider);
 const replyStyleMode = args["reply-style-mode"] || config.replyStyleMode || "match-user";
 const codexCommand = args["codex-command"] || process.env.DIGITAL_BRAIN_CODEX_COMMAND || config.codexCommand || "codex exec --skip-git-repo-check";
 const openaiApiKey = args["openai-api-key"] || process.env.OPENAI_API_KEY || config.openaiApiKey || "";
 const anthropicApiKey = args["anthropic-api-key"] || process.env.ANTHROPIC_API_KEY || config.anthropicApiKey || "";
-const xaiApiKey = args["xai-api-key"] || process.env.XAI_API_KEY || config.xaiApiKey || "";
+const xaiApiKey = args["xai-api-key"] || args["xci-api-key"] || process.env.XAI_API_KEY || process.env.XCI_API_KEY || config.xaiApiKey || config.xciApiKey || "";
 const allow = parseList(args.allow || "");
 const deny = parseList(args.deny || "");
 const contactNumbers = parseList([args.contact, args.phone, args["contact-number"]].filter(Boolean).join(","))
@@ -802,7 +802,7 @@ function assertAnthropicConfig() {
 
 function assertXaiConfig() {
   if (!xaiApiKey) {
-    throw new Error("xAI provider requires an API key. Set XAI_API_KEY, pass --xai-api-key, or re-run init and enter the key.");
+    throw new Error("xAI provider requires an API key. Set XAI_API_KEY or XCI_API_KEY, pass --xai-api-key or --xci-api-key, or re-run init and enter the key.");
   }
 }
 
@@ -828,11 +828,15 @@ function extractAnthropicText(body) {
 }
 
 function defaultModelForProvider(providerName) {
-  return DEFAULT_PROVIDER_MODELS[providerName] || DEFAULT_PROVIDER_MODELS.ollama;
+  return DEFAULT_PROVIDER_MODELS[normalizeProvider(providerName)] || DEFAULT_PROVIDER_MODELS.ollama;
 }
 
 function providerUsesModel(providerName) {
-  return ["ollama", "openai", "anthropic", "xai"].includes(providerName);
+  return ["ollama", "openai", "anthropic", "xai"].includes(normalizeProvider(providerName));
+}
+
+function normalizeProvider(providerName) {
+  return providerName === "xci" ? "xai" : providerName;
 }
 
 function cleanReply(value) {
@@ -1371,7 +1375,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.error('Usage: digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|codex|codex-app --model llama3.1 [--yes] [--allow-all] [--include-groups] [--include-businesses]');
+  console.error('Usage: digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|anthropic|xai|xci|codex|codex-app --model llama3.1 [--yes] [--allow-all] [--include-groups] [--include-businesses]');
   process.exit(1);
 }
 

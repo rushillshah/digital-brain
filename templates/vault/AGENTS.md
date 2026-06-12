@@ -22,4 +22,4 @@ Rules:
 - For writing as the user, prefer the user's own style profile before generic assistant tone.
 - For reply help, prefer person-level context over source-specific notes when available.
 - Do not read `08 Sources/` raw files unless the user explicitly asks you to inspect source data.
-- Prefer `06 AI Memory/` summaries and `04 People/` human notes for normal context.
+- Prefer `06 AI Memory/` summaries and `04 People/` human notes for normal context. Use `04 People/Generated/` only when the compact indexes need more detail.

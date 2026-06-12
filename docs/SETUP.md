@@ -65,19 +65,19 @@ Once setup passes, normal use is:
 digital-brain run
 ```
 
-`run` executes the live local sources selected during setup. If a selected live source does not exist or cannot be opened, the command fails with a setup error.
+`run` executes the live local sources selected during setup, imports any saved export paths, extracts relationships, and updates the vault indexes. `digital-brain ingest` is the same command.
 
-Optional imports:
+If you skipped export paths during setup, pass them to `run`:
 
 ```bash
-digital-brain import-slack --input ./slack-export.zip
-digital-brain import-teams --input ./teams-export.zip
-digital-brain import-linkedin --input ./linkedin-archive.zip
-digital-brain extract
-digital-brain interpret
+digital-brain run --sources slack --slack-input ./slack-export.zip
+digital-brain run --sources teams --teams-input ./teams-export.zip
+digital-brain run --sources linkedin --linkedin-input ./linkedin-archive.zip
+digital-brain run --sources gmail --gmail-input ./takeout.mbox --self-email you@example.com
+digital-brain run --sources calendar --calendar-input ./calendar.ics
 ```
 
-Useful direct sync commands:
+Direct source-specific commands still exist for debugging:
 
 ```bash
 digital-brain sync-whatsapp --days 30
@@ -87,34 +87,34 @@ digital-brain sync-imessage --days 30
 
 ## Which Commands Should I Run?
 
-Windows or cross-platform WhatsApp:
+Start with this:
 
 ```bash
-digital-brain sync-whatsapp-web --days 30
-digital-brain extract --days 30
-digital-brain interpret --days 30
+npx digital-brain init
+digital-brain run
 ```
 
-Mac local app sources:
+To connect everything supported:
 
 ```bash
-digital-brain sync-whatsapp --days 30
-digital-brain sync-imessage --days 30
-digital-brain extract --days 30
-digital-brain interpret --days 30
+digital-brain init --sources all
+digital-brain run --sources all
 ```
 
-Work exports:
+For one-off export ingestion without re-running setup:
 
 ```bash
-digital-brain import-slack --input ./slack-export.zip
-digital-brain import-teams --input ./teams-export.zip
-digital-brain import-linkedin --input ./linkedin-archive.zip
-digital-brain import-gmail --input ./takeout.mbox --self-email you@example.com
-digital-brain import-calendar --input ./calendar.ics
-digital-brain extract --days 365
-digital-brain interpret --days 365
+digital-brain run --sources slack,teams,gmail --slack-input ./slack-export.zip --teams-input ./teams-export.zip --gmail-input ./takeout.mbox --self-email you@example.com
 ```
+
+One-time AI graph review:
+
+```bash
+digital-brain graph-ai
+digital-brain graph-ai --provider anthropic --yes
+```
+
+The first command estimates tokens and cost. The second sends the compact graph bundle to the provider and writes reviewed graph notes back into the vault.
 
 Best with a local LLM:
 
@@ -130,3 +130,5 @@ OPENAI_API_KEY="sk-..." digital-brain auto-whatsapp --allow "Name" --provider op
 ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow "Name" --provider anthropic --yes
 XAI_API_KEY="xai-..." digital-brain auto-whatsapp --allow "Name" --provider xai --yes
 ```
+
+`XCI_API_KEY`, `--xci-api-key`, and `--provider xci` are accepted as aliases for xAI.

@@ -47,48 +47,15 @@ Install and create a vault:
 
 ```bash
 npx digital-brain init
+digital-brain run
 ```
 
-Then pick the source path that matches your machine.
-
-### Windows Or Cross-Platform
-
-Use WhatsApp Web/Desktop linked-device sync. This is the recommended WhatsApp path for Windows.
+`init` asks what to connect: WhatsApp, iMessage, Slack, Teams, LinkedIn, Gmail, Calendar, and GitHub/local repos. If you give export paths during setup, `run` ingests them and then updates the knowledge graph. `ingest` is an alias for `run`.
 
 ```bash
-digital-brain sync-whatsapp-web --days 30
-digital-brain extract --days 30
-digital-brain interpret --days 30
-```
-
-On first run, scan the QR from WhatsApp > Linked devices.
-
-### Mac
-
-Mac can use the same cross-platform WhatsApp Web sync, plus macOS-only local sources:
-
-```bash
-digital-brain sync-whatsapp-web --days 30
-digital-brain sync-whatsapp --days 30
-digital-brain sync-imessage --days 30
-digital-brain extract --days 30
-digital-brain interpret --days 30
-```
-
-`sync-whatsapp` and `sync-imessage` need local app database access and may require Full Disk Access.
-
-### Work Sources
-
-Official exports and API-backed sends work on Windows, Mac, and Linux:
-
-```bash
-digital-brain import-slack --input ./slack-export.zip
-digital-brain import-teams --input ./teams-export.zip
-digital-brain import-linkedin --input ./linkedin-archive.zip
-digital-brain import-gmail --input ./takeout.mbox --self-email you@example.com
-digital-brain import-calendar --input ./calendar.ics
-digital-brain extract --days 365
-digital-brain interpret --days 365
+digital-brain run --sources all
+digital-brain run --sources slack --slack-input ./slack-export.zip
+digital-brain graph-ai
 ```
 
 ### Best With An LLM
@@ -108,7 +75,26 @@ ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow "Name" --prov
 XAI_API_KEY="xai-..." digital-brain auto-whatsapp --allow "Name" --provider xai --yes
 ```
 
-For general questions, point your AI assistant at the vault files under `06 AI Memory/` and `08 Sources/Analysis/`.
+`XCI_API_KEY`, `--xci-api-key`, and `--provider xci` are accepted as aliases for xAI.
+
+For general questions, point your AI assistant at the compact vault files under `06 AI Memory/`. Generated per-person drafts live under `04 People/Generated/`; raw source data stays under `08 Sources/`.
+
+### One-Time AI Graph Review
+
+The regular `run` command uses local parsing and conservative heuristics. For a deeper one-time cleanup, estimate cost first:
+
+```bash
+digital-brain graph-ai
+```
+
+Then run it with a hosted provider:
+
+```bash
+ANTHROPIC_API_KEY="sk-ant-..." digital-brain graph-ai --provider anthropic --yes
+XAI_API_KEY="xai-..." digital-brain graph-ai --provider xai --yes
+```
+
+It sends a compact graph bundle, not raw source folders, and writes `06 AI Memory/AI Graph Review.md`, `00 Home/Graph Index.md`, and `08 Sources/Analysis/ai_graph_review_manifest.json`. Override pricing assumptions with `--input-cost-per-1m` and `--output-cost-per-1m`.
 
 ### Ask An AI For Help
 
@@ -214,19 +200,13 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 ```bash
 digital-brain init
 digital-brain run
+digital-brain ingest
+digital-brain run --sources all
+digital-brain run --sources slack --slack-input ./slack-export.zip
+digital-brain graph-ai
+digital-brain graph-ai --provider anthropic --yes
 digital-brain demo-proof --out ./demo-assets
-digital-brain showcase --out ./demo-assets
 digital-brain doctor
-digital-brain sync-whatsapp --days 30
-digital-brain sync-whatsapp-web --days 30
-digital-brain sync-imessage --days 30
-digital-brain import-slack --input ./slack-export.zip
-digital-brain import-teams --input ./teams-export.zip
-digital-brain import-linkedin --input ./linkedin-archive.zip
-digital-brain import-gmail --input ./takeout.mbox
-digital-brain import-calendar --input ./calendar.ics
-digital-brain import-repos --input ./codewiser-frontend --input ./codewiser-backend
-digital-brain connect-repos
 digital-brain send-whatsapp --to "Name" --message "text"
 digital-brain send-slack --channel C123 --message "text"
 digital-brain send-teams --chat 19:abc --message "text"
@@ -247,7 +227,7 @@ While `auto-whatsapp` is running in a focused terminal, press `Space` to pause/r
 
 `init` remembers your vault globally, so `run` works from anywhere. `run` syncs the live local sources you selected, extracts relationships, and writes interpreted memory in one command.
 
-Slack, Microsoft Teams, and LinkedIn are import-based. Digital Brain reads official export archives; it does not scrape LinkedIn or automate private app UIs. Teams outbound uses Microsoft Graph. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+Slack, Microsoft Teams, LinkedIn, Gmail, and Calendar are import-based. Give their export paths during `init`, or pass `--slack-input`, `--teams-input`, `--linkedin-input`, `--gmail-input`, or `--calendar-input` to `run`. Digital Brain reads official export archives; it does not scrape private app UIs. Teams outbound uses Microsoft Graph. See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 Repository context is local-first too. During `init`, choose `Git repositories`, then `Connect GitHub` to use the GitHub CLI auth flow, pick allowed repos, and clone/pull them into `~/.digital-brain/github-repos`. You can also skip GitHub and use local paths. `import-repos` reads high-level repo artifacts, not full source dumps, and writes `06 AI Memory/Project Context.md` plus per-repo notes under `08 Sources/Repositories`.
 
@@ -302,7 +282,7 @@ ANTHROPIC_API_KEY="sk-ant-..." digital-brain auto-whatsapp --allow-all --provide
 XAI_API_KEY="xai-..." digital-brain auto-whatsapp --allow-all --provider xai --yes
 ```
 
-If you select `OpenAI API`, `Anthropic API`, or `xAI API` during `digital-brain init`, you can either paste an API key to store it in the local vault config or leave it blank and set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `XAI_API_KEY` before running `auto-whatsapp`.
+If you select `OpenAI API`, `Anthropic API`, or `xAI API` during `digital-brain init`, you can either paste an API key to store it in the local vault config or leave it blank and set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `XAI_API_KEY`, or the xAI alias `XCI_API_KEY` before running `auto-whatsapp`.
 
 ```bash
 digital-brain auto-whatsapp --allow-all --provider codex --yes

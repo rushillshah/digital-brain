@@ -16,6 +16,15 @@ After setup, the normal manual command is:
 digital-brain run
 ```
 
+For one-time AI cleanup of the generated Obsidian graph:
+
+```bash
+digital-brain graph-ai
+digital-brain graph-ai --provider anthropic --yes
+```
+
+`graph-ai` estimates token usage and cost before any provider call. With `--yes`, it sends compact memory/index files, not raw source folders, and writes `06 AI Memory/AI Graph Review.md`, `00 Home/Graph Index.md`, and `08 Sources/Analysis/ai_graph_review_manifest.json`.
+
 `init` saves your default vault in `~/.digital-brain/config.json`, so `run` does not need a vault path.
 
 ## Configurable At Install
@@ -173,7 +182,7 @@ digital-brain auto-whatsapp --allow "Mom" --provider codex --codex-command "code
 
 `--provider anthropic` uses Anthropic's Messages API with default model `claude-sonnet-4-6`. Set `ANTHROPIC_API_KEY`, pass `--anthropic-api-key`, or choose Anthropic during `digital-brain init` and paste the key into the local vault config.
 
-`--provider xai` uses xAI's OpenAI-compatible Responses API with default model `grok-4.3`. Set `XAI_API_KEY`, pass `--xai-api-key`, or choose xAI during `digital-brain init` and paste the key into the local vault config.
+`--provider xai` uses xAI's OpenAI-compatible Responses API with default model `grok-4.3`. Set `XAI_API_KEY`, pass `--xai-api-key`, or choose xAI during `digital-brain init` and paste the key into the local vault config. `XCI_API_KEY`, `--xci-api-key`, and `--provider xci` are accepted aliases.
 
 `--reply-style-mode` supports `match-user`, `casual-imperfect`, and `clean-formal`. `match-user` is the default. `casual-imperfect` allows light lowercase, shorthand, missing apostrophes, and small natural imperfections when they fit the learned style. `clean-formal` prioritizes cleaner spelling, capitalization, and punctuation.
 
@@ -207,7 +216,7 @@ Guardrails:
 - with `--provider ollama`, requires the selected model, for example `ollama pull llama3.1`
 - with `--provider openai`, requires `OPENAI_API_KEY`, `--openai-api-key`, or `openaiApiKey` in the vault config
 - with `--provider anthropic`, requires `ANTHROPIC_API_KEY`, `--anthropic-api-key`, or `anthropicApiKey` in the vault config
-- with `--provider xai`, requires `XAI_API_KEY`, `--xai-api-key`, or `xaiApiKey` in the vault config
+- with `--provider xai` or `--provider xci`, requires `XAI_API_KEY`, `XCI_API_KEY`, `--xai-api-key`, `--xci-api-key`, or `xaiApiKey` in the vault config
 - with `--provider codex`, requires a working local Codex command
 - with `--provider codex-app`, requires a Codex desktop bridge automation/thread that writes response files
 - with `--reply-style-mode`, stores the same preference from init in `digital-brain.config.json`

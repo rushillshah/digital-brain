@@ -24,6 +24,8 @@ ROLE_TERMS = {
 POSSESSIVE_ROLE_RE = re.compile(r"\b(my|your|his|her|their|our|the)\s+(mom|mum|mummy|maa|mother|dad|papa|father|sister|brother|cousin|uncle|aunt|aunty)\b")
 SECOND_PERSON_KINSHIP_RE = re.compile(r"\b(you are|you're|u are|ur|as my|my|as your|your)\s+(older|younger|little|big)?\s*(sister|brother|sis)\b")
 WORK_SIGNAL_RE = re.compile(r"\b(pr|pull request|merge|deploy|deployment|github|repo|frontend|backend|client|customer|intern|manager|founder|investor|meeting|standup|sprint|ticket|issue|bug|production|staging|dev)\b")
+SOCIAL_SIGNAL_RE = re.compile(r"\b(friend|friends|bro|boys|girls|party|trip|dinner|drinks|hang|hangout|birthday|wedding|game|movie|club|dance)\b")
+SUPPORT_SIGNAL_RE = re.compile(r"\b(doctor|hospital|clinic|medicine|meds|therapy|physio|lawyer|bank|hdfc|repair|service|driver|delivery)\b")
 ROMANTIC_SIGNAL_RE = re.compile(r"\b(babe|baby|my love|love you|ily|miss you|girlfriend|boyfriend)\b")
 FAMILY_CONTEXT_RE = re.compile(r"\b(home|parents|family|mom|mum|mummy|maa|dad|papa|father|mother|cousin|uncle|aunt|aunty)\b")
 STOPWORDS = {
@@ -110,7 +112,7 @@ def profile_chat(chat_key, messages):
     operational = (logistics + work) / max(count, 1)
     sentiment = normalized_sentiment(positive, negative, count)
     tags = infer_tags(any(m.get("isGroup") for m in messages), count, inbound, outbound, warmth, friction, operational, work, logistics, text.count("?"))
-    guess = infer_relationship(tags, count, warmth, friction, operational, work, outbound / count)
+    guess, guess_confidence, guess_reason = infer_relationship(tags, count, warmth, friction, operational, work, outbound / count, role_scores, metadata_signals)
     identity = infer_identity(source, chat_name, messages)
     return {
         "chatName": chat_name,
@@ -133,6 +135,8 @@ def profile_chat(chat_key, messages):
         "operationalScore": round(operational, 3),
         "questionCount": text.count("?"),
         "relationshipGuess": guess,
+        "relationshipGuessConfidence": guess_confidence,
+        "relationshipGuessReason": guess_reason,
         "roleEvidence": role_evidence,
         "roleEvidenceScores": role_scores,
         "metadataSignals": metadata_signals,
@@ -161,22 +165,45 @@ def infer_tags(group, count, inbound, outbound, warmth, friction, operational, w
     return tags
 
 
-def infer_relationship(tags, count, warmth, friction, operational, work, balance):
+def infer_relationship(tags, count, warmth, friction, operational, work, balance, role_scores, metadata_signals):
+    evidence_role, evidence_score = top_role_score(role_scores)
+    if evidence_role and evidence_score >= 5:
+        return evidence_role, "high" if evidence_score >= 7 else "medium", f"explicit conversation/source evidence score {evidence_score}"
+    if evidence_role and evidence_score >= 3:
+        return evidence_role, "medium", f"moderate conversation/source evidence score {evidence_score}"
+    if metadata_has_work_signal(metadata_signals):
+        return "work collaborator", "medium", "work metadata from source profile"
     if "group-chat" in tags:
-        return "group, likely work/project or operational" if work > 10 else "group, likely social or mixed context"
+        if work > 10 or "work-signal" in tags:
+            return "group, likely work/project or operational", "medium", "group chat with work/project terms"
+        return "group, likely social or mixed context", "low", "group chat without strong role evidence"
     if count >= 500 and warmth > 0.06:
-        return "close/high-context personal relationship"
+        return "close/high-context personal relationship", "low", "high volume and warmth without explicit role"
     if count >= 200 and operational > 0.1:
-        return "active operational relationship"
+        return "active operational relationship", "low", "high volume with logistics-heavy communication"
     if work > 10 and operational > 0.08:
-        return "work or project relationship"
+        return "work or project relationship", "medium", "repeated work/project terms"
     if warmth > 0.08:
-        return "warm personal relationship"
+        return "warm personal relationship", "low", "warmth signal without explicit role"
     if friction > 0.05:
-        return "relationship with friction or emotionally charged moments"
+        return "relationship with friction or emotionally charged moments", "low", "friction signal without relationship label"
     if balance < 0.25 or balance > 0.75:
-        return "asymmetric communication pattern"
-    return "general relationship, needs human labeling"
+        return "asymmetric communication pattern", "low", "one side drives most messages"
+    return "general relationship, needs human labeling", "low", "no reliable role evidence"
+
+
+def top_role_score(role_scores):
+    if not role_scores:
+        return "", 0
+    role, score = next(iter(role_scores.items()))
+    return role, score
+
+
+def metadata_has_work_signal(signals):
+    for key in ("titles", "departments", "companies", "emailDomains"):
+        if signals.get(key):
+            return True
+    return False
 
 
 def extract_role_evidence(messages):
@@ -302,6 +329,11 @@ def add_context_evidence(evidence, seen, normalized, body, direction):
         add_role_evidence(evidence, seen, "romantic partner", "romantic phrase", 3, body, direction)
     if FAMILY_CONTEXT_RE.search(normalized) and re.search(r"\b(come|coming|home|parents|family|dinner|hospital|doctor)\b", normalized):
         add_role_evidence(evidence, seen, "family", "family/logistics context", 1, body, direction)
+    social_hits = SOCIAL_SIGNAL_RE.findall(normalized)
+    if len(set(social_hits)) >= 2:
+        add_role_evidence(evidence, seen, "friend", "social context signals", 2, body, direction)
+    if SUPPORT_SIGNAL_RE.search(normalized):
+        add_role_evidence(evidence, seen, "service/support contact", "support/service context", 1, body, direction)
 
 
 def add_role_evidence(evidence, seen, role, signal, weight, body, direction):
@@ -473,6 +505,7 @@ def write_markdown(path, profiles, days):
             f"- Source: {profile['sourceSystem']}",
             f"- Canonical person: {profile['identityName']} ({profile['canonicalPersonKey']})",
             f"- Guess: {profile['relationshipGuess']}",
+            f"- Guess confidence: {profile.get('relationshipGuessConfidence', 'low')} ({profile.get('relationshipGuessReason', 'no reason recorded')})",
             f"- Messages: {profile['messageCount']} ({profile['inbound']} inbound, {profile['outbound']} outbound)",
             f"- Dates: {profile['firstSeen']} to {profile['lastSeen']}",
             f"- Scores: sentiment {profile['sentimentScore']}, warmth {profile['warmthScore']}, friction {profile['frictionScore']}, operational {profile['operationalScore']}",
