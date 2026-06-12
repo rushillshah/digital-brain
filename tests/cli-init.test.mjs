@@ -493,6 +493,23 @@ test("tutorial prints setup guidance", () => {
   assert.match(result.stdout, /digital-brain init/);
 });
 
+test("default command is the terminal UI while help remains scriptable", () => {
+  const source = read(path.join(repo, "bin", "digital-brain.js"));
+  const uiSource = read(path.join(repo, "lib", "ui.js"));
+  const help = run([cli, "help"], { HOME: testHome(tempDir()) });
+  const noTty = runRaw([cli], { HOME: testHome(tempDir()) });
+
+  assert.match(source, /command = "ui"/);
+  assert.match(source, /lib\/ui\.js/);
+  assert.match(uiSource, /Keys: up\/down move/);
+  assert.match(uiSource, /Connect or toggle sources/);
+  assert.match(uiSource, /Send a draft\/test message/);
+  assert.match(help.stdout, /Usage:/);
+  assert.match(help.stdout, /digital-brain ui/);
+  assert.notEqual(noTty.status, 0);
+  assert.match(`${noTty.stdout}\n${noTty.stderr}`, /interactive terminal/);
+});
+
 test("graph-ai estimates one-time AI graph review cost without an API key", () => {
   const root = tempDir();
   const vault = path.join(root, "sample-vault");

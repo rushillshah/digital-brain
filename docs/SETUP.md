@@ -3,7 +3,16 @@
 Digital Brain is designed to install with one npm command:
 
 ```bash
+npx digital-brain
+```
+
+The default command opens the interactive terminal dashboard. Use arrow keys to create a vault, connect sources, run ingest, estimate AI graph review cost, or open setup checks.
+
+Scriptable setup still works:
+
+```bash
 npx digital-brain init
+digital-brain run
 ```
 
 npm installs the Node dependencies. No pip install is needed; the Python scripts only use the standard library.
@@ -38,6 +47,7 @@ For a short usage guide:
 
 ```bash
 digital-brain tutorial
+digital-brain help
 ```
 
 ## What Cannot Be Silently Installed

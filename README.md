@@ -46,6 +46,14 @@ Digital Brain gives them a structured, local map of:
 Install and create a vault:
 
 ```bash
+npx digital-brain
+```
+
+The default command opens an interactive terminal dashboard with arrow-key navigation. Use it to create a vault, connect sources, run ingest, estimate AI graph review cost, and start outbound tools.
+
+For scriptable setup:
+
+```bash
 npx digital-brain init
 digital-brain run
 ```
@@ -198,6 +206,8 @@ node ./bin/digital-brain.js init ./Digital Brain\ Vault
 ## Core Commands
 
 ```bash
+digital-brain
+digital-brain ui
 digital-brain init
 digital-brain run
 digital-brain ingest
@@ -207,6 +217,7 @@ digital-brain graph-ai
 digital-brain graph-ai --provider anthropic --yes
 digital-brain demo-proof --out ./demo-assets
 digital-brain doctor
+digital-brain help
 digital-brain send-whatsapp --to "Name" --message "text"
 digital-brain send-slack --channel C123 --message "text"
 digital-brain send-teams --chat 19:abc --message "text"

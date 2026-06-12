@@ -45,10 +45,12 @@ main().catch((error) => {
 });
 
 async function main() {
-  const [command = "help", ...argv] = process.argv.slice(2);
+  const [command = "ui", ...argv] = process.argv.slice(2);
   const args = parseArgs(argv);
 
   if (command === "init") await init(argv, args);
+  else if (command === "ui") runNodeRaw("lib/ui.js", argv);
+  else if (command === "help" || command === "--help" || command === "-h") help();
   else if (command === "run" || command === "refresh" || command === "ingest") await runRefresh(argv, args);
   else if (command === "doctor") doctor();
   else if (command === "tutorial" || command === "setup-check") doctor({ tutorial: true });
@@ -408,6 +410,11 @@ function runNodeStep(script, argv) {
 
 function runNode(script, argv) {
   const result = spawnSync(process.execPath, [path.join(root, script), ...withVault(argv)], { stdio: "inherit" });
+  process.exit(result.status ?? 1);
+}
+
+function runNodeRaw(script, argv) {
+  const result = spawnSync(process.execPath, [path.join(root, script), ...argv], { stdio: "inherit" });
   process.exit(result.status ?? 1);
 }
 
@@ -1243,6 +1250,8 @@ function help() {
   console.log(`Digital Brain
 
 Usage:
+  digital-brain
+  digital-brain ui
   digital-brain init [vault]
   digital-brain run
   digital-brain ingest

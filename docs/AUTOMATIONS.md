@@ -16,6 +16,14 @@ After setup, the normal manual command is:
 digital-brain run
 ```
 
+For interactive local use, run:
+
+```bash
+digital-brain
+```
+
+That opens the terminal dashboard. Arrow keys move, Enter runs the selected action, `r` runs ingest, `g` estimates AI graph review, `d` opens doctor, and `q` exits.
+
 For one-time AI cleanup of the generated Obsidian graph:
 
 ```bash
