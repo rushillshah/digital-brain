@@ -6,6 +6,7 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { copyDir, ensureDir, packageRoot, resolveVault, writeDefaultVault } from "../lib/fs.js";
+import { askCancelable } from "../lib/prompt.js";
 import { emitTelemetry, readTelemetryPreference, writeTelemetryPreference } from "../lib/telemetry.js";
 
 const root = packageRoot(import.meta.url);
@@ -837,20 +838,36 @@ function printSetupHeader(defaultVault) {
   console.log("│ 🧠 Digital Brain setup                 │");
   console.log("╰────────────────────────────────────────╯");
   console.log("Pick with A/B/C, 1/2/3, exact value, or press Enter for the default.");
+  console.log("Press ← (left arrow) on any question to cancel setup without saving.");
   console.log(`Skipping the vault path creates: ${defaultVault}`);
   console.log("");
 }
 
+const SETUP_CANCEL_WORDS = ["proceed", "p", "omit", "yes", "y"];
+
+async function askLine(rl, query) {
+  const result = await askCancelable(rl, query);
+  if (!result.cancelled) return result.value;
+  console.log("");
+  const choice = (await rl.question("✋ Omit setup? It will not be saved. [proceed/cancel]: ")).trim().toLowerCase();
+  if (SETUP_CANCEL_WORDS.includes(choice)) {
+    console.log("Setup cancelled — nothing was saved.");
+    rl.close();
+    process.exit(0);
+  }
+  return askLine(rl, query);
+}
+
 async function ask(rl, label, fallback, helpText = "") {
   if (helpText) console.log(`  ${helpText}`);
-  const answer = await rl.question(`${label} [${fallback}]: `);
+  const answer = await askLine(rl, `${label} [${fallback}]: `);
   return answer.trim() || fallback;
 }
 
 async function askSecret(rl, label, options = {}) {
   if (options.helpText) console.log(`  ${options.helpText}`);
   const suffix = options.fallbackLabel ? ` [${options.fallbackLabel}]` : "";
-  const answer = await rl.question(`${label}${suffix}: `);
+  const answer = await askLine(rl, `${label}${suffix}: `);
   return answer.trim();
 }
 
@@ -873,7 +890,7 @@ async function select(rl, label, options, fallback) {
     console.log(`  ${letter}) ${icon}  ${title}${marker}`);
     console.log(`     ${description}`);
   });
-  const answer = await rl.question(`Choose ${letterFor(defaultIndex)}/${defaultIndex + 1} [${letterFor(defaultIndex)}]: `);
+  const answer = await askLine(rl, `Choose ${letterFor(defaultIndex)}/${defaultIndex + 1} [${letterFor(defaultIndex)}]: `);
   const trimmed = answer.trim();
   if (!trimmed) return options[defaultIndex][0];
   const letterIndex = indexFromLetter(trimmed);
@@ -895,7 +912,7 @@ async function multiSelect(rl, label, options, fallbackValues) {
     console.log(`  ${letter}) ${icon}  ${title}${selected}`);
     console.log(`     ${description}`);
   });
-  const answer = await rl.question(`Choose one or more, comma-separated [${fallback.join(",")}]: `);
+  const answer = await askLine(rl, `Choose one or more, comma-separated [${fallback.join(",")}]: `);
   if (!answer.trim()) return fallback;
   const values = [];
   for (const token of answer.split(",").map((value) => value.trim()).filter(Boolean)) {
@@ -909,7 +926,7 @@ async function multiSelect(rl, label, options, fallbackValues) {
 
 async function confirm(rl, label, fallback) {
   const hint = fallback ? "Y/n" : "y/N";
-  const answer = (await rl.question(`${label} [${hint}]: `)).trim().toLowerCase();
+  const answer = (await askLine(rl, `${label} [${hint}]: `)).trim().toLowerCase();
   if (!answer) return fallback;
   return ["y", "yes", "true", "1"].includes(answer);
 }
