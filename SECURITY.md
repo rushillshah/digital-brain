@@ -18,6 +18,9 @@ Open a minimal public issue titled `Security: private report needed`, or contact
 - Messages and generated memory are stored as local files.
 - Telemetry is opt-in, anonymous, and content-free.
 - Outbound sending requires explicit configuration and should be tested in draft mode first.
+- ZIP importers reject archive entries that try to escape the extraction directory.
+- Local config files are written with owner-only permissions on POSIX systems where supported.
+- Chromium sandboxing stays enabled by default. Set `DIGITAL_BRAIN_CHROME_NO_SANDBOX=1` only in constrained environments that require it.
 
 ## High-Risk Areas
 

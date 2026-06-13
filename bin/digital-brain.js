@@ -6,15 +6,36 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { copyDir, ensureDir, packageRoot, resolveVault, writeDefaultVault } from "../lib/fs.js";
+import { askCancelable, chooseInteractive } from "../lib/prompt.js";
 import { emitTelemetry, readTelemetryPreference, writeTelemetryPreference } from "../lib/telemetry.js";
 
 const root = packageRoot(import.meta.url);
 const CONFIG_SCHEMA_VERSION = 1;
+const SOURCE_OPTIONS = [
+  ["all", "All supported sources", "Set up every live/import source this machine can connect to.", "*"],
+  ["whatsapp", "WhatsApp Mac", "Live local sync from WhatsApp for Mac database.", "WA"],
+  ["whatsapp-web", "WhatsApp Desktop/Web", "Cross-platform sync through a linked WhatsApp Web/Desktop session.", "Web"],
+  ["imessage", "Apple iMessage", "Live local sync from macOS Messages database.", "iMsg"],
+  ["slack", "Slack export", "Import official Slack workspace export ZIP/folder.", "Slack"],
+  ["teams", "Microsoft Teams export", "Import Microsoft Teams export JSON/ZIP/folder.", "Teams"],
+  ["linkedin", "LinkedIn archive", "Import official LinkedIn data archive ZIP/folder.", "LI"],
+  ["gmail", "Gmail Takeout", "Import official Gmail Takeout .mbox or ZIP.", "Mail"],
+  ["calendar", "Google Calendar", "Import official Google Calendar .ics export.", "Cal"],
+  ["repos", "Git repositories", "Index local repo READMEs, manifests, remotes, and recent commits.", "Git"],
+];
+const ALL_SOURCES = SOURCE_OPTIONS.map(([value]) => value).filter((value) => value !== "all");
+const IMPORT_SOURCES = {
+  slack: { label: "Slack", script: "digital_brain_slack_export_import.py", arg: "slack-input", hint: "Slack export ZIP/folder" },
+  teams: { label: "Microsoft Teams", script: "digital_brain_teams_export_import.py", arg: "teams-input", hint: "Teams export ZIP/folder", selfEmail: true, privacy: true },
+  linkedin: { label: "LinkedIn", script: "digital_brain_linkedin_export_import.py", arg: "linkedin-input", hint: "LinkedIn archive ZIP/folder" },
+  gmail: { label: "Gmail", script: "digital_brain_gmail_takeout_import.py", arg: "gmail-input", hint: "Gmail Takeout .mbox/ZIP", selfEmail: true, privacy: true, markdown: true },
+  calendar: { label: "Google Calendar", script: "digital_brain_google_calendar_import.py", arg: "calendar-input", hint: "Calendar .ics/ZIP", calendarWindow: true },
+};
 const PROVIDERS = {
   ollama: { label: "Ollama local model", model: "llama3.1", icon: "🦙" },
   openai: { label: "OpenAI API", model: "gpt-4.1-mini", keyEnv: "OPENAI_API_KEY", keyField: "openaiApiKey", keyArg: "openai-api-key", modelArg: "openai-model", icon: "⚡" },
   anthropic: { label: "Anthropic API", model: "claude-sonnet-4-6", keyEnv: "ANTHROPIC_API_KEY", keyField: "anthropicApiKey", keyArg: "anthropic-api-key", modelArg: "anthropic-model", icon: "🔶" },
-  xai: { label: "xAI API", model: "grok-4.3", keyEnv: "XAI_API_KEY", keyField: "xaiApiKey", keyArg: "xai-api-key", modelArg: "xai-model", icon: "✕" },
+  xai: { label: "xAI API", model: "grok-4.3", keyEnv: "XAI_API_KEY", keyEnvAlias: "XCI_API_KEY", keyField: "xaiApiKey", keyArg: "xai-api-key", keyArgAlias: "xci-api-key", modelArg: "xai-model", modelArgAlias: "xci-model", icon: "✕" },
   "codex-app": { label: "Codex app bridge", icon: "🧠" },
   codex: { label: "Codex CLI", icon: "⌨️" },
 };
@@ -25,14 +46,17 @@ main().catch((error) => {
 });
 
 async function main() {
-  const [command = "help", ...argv] = process.argv.slice(2);
+  const [command = "ui", ...argv] = process.argv.slice(2);
   const args = parseArgs(argv);
 
   if (command === "init") await init(argv, args);
-  else if (command === "run" || command === "refresh") await runRefresh(argv, args);
+  else if (command === "ui") runNodeRaw("lib/ui.js", argv);
+  else if (command === "help" || command === "--help" || command === "-h") help();
+  else if (command === "run" || command === "refresh" || command === "ingest") await runRefresh(argv, args);
   else if (command === "doctor") doctor();
   else if (command === "tutorial" || command === "setup-check") doctor({ tutorial: true });
   else if (command === "demo-proof" || command === "showcase") demoProof(argv, args);
+  else if (command === "graph-ai" || command === "graph-review") runNode("lib/graph-ai.js", argv);
   else if (command === "sync-whatsapp") runPython("digital_brain_whatsapp_mac_sync.py", argv);
   else if (command === "sync-whatsapp-web") runNode("whatsapp-web/sync.mjs", argv);
   else if (command === "sync-imessage") runPython("digital_brain_imessage_sync.py", argv);
@@ -71,16 +95,17 @@ async function init(argv, args) {
   let activeWindow = args["active-window"] || "08:00-12:00";
   let timezone = args.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
   let outboundMode = args["outbound-mode"] || "draft";
-  let autoReplyProvider = args["auto-reply-provider"] || args.provider || "ollama";
+  let autoReplyProvider = normalizeProvider(args["auto-reply-provider"] || args.provider || "ollama");
   let openaiApiKey = args["openai-api-key"] || "";
   let anthropicApiKey = args["anthropic-api-key"] || "";
-  let xaiApiKey = args["xai-api-key"] || "";
+  let xaiApiKey = args["xai-api-key"] || args["xci-api-key"] || "";
   let autoReplyModel = args.model || providerSpecificModelArg(args, autoReplyProvider) || defaultModelForProvider(autoReplyProvider);
   let replyStyleMode = args["reply-style-mode"] || "match-user";
   let repoPaths = parseList(args["repo-paths"] || args.repos || "");
   let privacyMode = args["privacy-mode"] || "standard";
   let sourceMarkdownMode = args["source-markdown-mode"] || "none";
-  let selectedSources = parseList(args.sources || "whatsapp");
+  let selectedSources = parseSources(args.sources || (args.yes ? "whatsapp" : "all"));
+  let sourceInputs = sourceInputsFromArgs(args);
   let responsibilityAccepted = toBoolean(args["responsibility-accepted"]) || fullAuto || schedule === "always-on";
   let telemetryEnabled = toBoolean(args.telemetry);
 
@@ -119,17 +144,8 @@ async function init(argv, args) {
       });
     }
     activeWindow = await ask(rl, "🪟 Active window for frequent refreshes", activeWindow);
-    selectedSources = await multiSelect(rl, "Sources to set up", [
-      ["whatsapp", "WhatsApp Mac", "Live local sync from WhatsApp for Mac database.", "💚"],
-      ["whatsapp-web", "WhatsApp Desktop/Web", "Cross-platform sync through a linked WhatsApp Web/Desktop session.", "🌐"],
-      ["imessage", "Apple iMessage", "Live local sync from macOS Messages database.", "💬"],
-      ["slack", "Slack export", "Import official Slack workspace export ZIP/folder.", "🧵"],
-      ["teams", "Microsoft Teams export", "Import Microsoft Teams export JSON/ZIP/folder.", "🟪"],
-      ["linkedin", "LinkedIn archive", "Import official LinkedIn data archive ZIP/folder.", "💼"],
-      ["gmail", "Gmail Takeout", "Import official Gmail Takeout .mbox or ZIP.", "📧"],
-      ["calendar", "Google Calendar", "Import official Google Calendar .ics export.", "🗓️"],
-      ["repos", "Git repositories", "Index local repo READMEs, manifests, remotes, and recent commits.", "📦"],
-    ], selectedSources);
+    selectedSources = parseSources(await multiSelect(rl, "Sources to set up", SOURCE_OPTIONS, selectedSources));
+    sourceInputs = await configureImportSourceInputs(rl, selectedSources, sourceInputs);
     if (selectedSources.includes("repos")) repoPaths = await configureRepositoryContext(rl, args, repoPaths);
     privacyMode = await select(rl, "Privacy mode", [
       ["standard", "Standard", "Keep raw JSONL locally for analysis, but do not generate raw chat Markdown.", "🔐"],
@@ -150,6 +166,7 @@ async function init(argv, args) {
         ["codex-app", "Codex app bridge", "Uses request/response files for a Codex desktop automation or thread.", "🧠"],
         ["codex", "Codex CLI", "Uses a local codex command; only choose this if the CLI works.", "⌨️"],
       ], autoReplyProvider);
+      autoReplyProvider = normalizeProvider(autoReplyProvider);
       const providerMeta = PROVIDERS[autoReplyProvider];
       if (!args.model && !providerSpecificModelArg(args, autoReplyProvider)) {
         autoReplyModel = defaultModelForProvider(autoReplyProvider);
@@ -157,8 +174,8 @@ async function init(argv, args) {
       if (providerMeta?.keyEnv) {
         autoReplyModel = await ask(rl, `🤖 ${providerMeta.label} model`, autoReplyModel || providerMeta.model);
         const apiKey = await askSecret(rl, `🔑 ${providerMeta.label} key`, {
-          fallbackLabel: process.env[providerMeta.keyEnv] ? `${providerMeta.keyEnv} env found` : `use ${providerMeta.keyEnv} at runtime`,
-          helpText: `Paste a key to store it locally in this vault config. Leave blank to use ${providerMeta.keyEnv} at runtime.`,
+          fallbackLabel: providerEnvFound(providerMeta) ? `${providerEnvLabel(providerMeta)} env found` : `use ${providerEnvLabel(providerMeta)} at runtime`,
+          helpText: `Paste a key to store it locally in this vault config. Leave blank to use ${providerEnvLabel(providerMeta)} at runtime.`,
         });
         if (autoReplyProvider === "openai") openaiApiKey = apiKey;
         if (autoReplyProvider === "anthropic") anthropicApiKey = apiKey;
@@ -207,6 +224,7 @@ async function init(argv, args) {
     privacyMode,
     sourceMarkdownMode,
     selectedSources,
+    sourceInputs,
     repoPaths,
     outboundLogMode: args["outbound-log-mode"] || "metadata",
     setupMode,
@@ -270,8 +288,8 @@ async function init(argv, args) {
   if (autoReplyProvider === "anthropic" && !anthropicApiKey && !process.env.ANTHROPIC_API_KEY) {
     console.log("Anthropic provider selected. Set ANTHROPIC_API_KEY before running auto-whatsapp, or add anthropicApiKey to the vault config.");
   }
-  if (autoReplyProvider === "xai" && !xaiApiKey && !process.env.XAI_API_KEY) {
-    console.log("xAI provider selected. Set XAI_API_KEY before running auto-whatsapp, or add xaiApiKey to the vault config.");
+  if (autoReplyProvider === "xai" && !xaiApiKey && !process.env.XAI_API_KEY && !process.env.XCI_API_KEY) {
+    console.log("xAI provider selected. Set XAI_API_KEY or XCI_API_KEY before running auto-whatsapp, or add xaiApiKey to the vault config.");
   }
   console.log("Next:");
   console.log("  digital-brain run");
@@ -295,7 +313,8 @@ async function runRefresh(argv, args) {
   const days = String(args.days || args["data-window-days"] || config.dataWindowDays || 30);
   const markdownMode = args["markdown-mode"] || config.sourceMarkdownMode || "none";
   const privacyMode = args["privacy-mode"] || config.privacyMode || "standard";
-  const selectedSources = parseList(args.sources || "").length ? parseList(args.sources) : config.selectedSources || ["whatsapp"];
+  const selectedSources = parseSources(args.sources || "").length ? parseSources(args.sources) : config.selectedSources || ["whatsapp"];
+  const sourceInputs = mergeSourceInputs(config.sourceInputs || {}, sourceInputsFromArgs(args));
   const repoPaths = parseList(args["repo-paths"] || args.repos || "").length ? parseList(args["repo-paths"] || args.repos) : config.repoPaths || [];
   const syncArgs = ["--vault", vault, "--days", days, "--markdown-mode", markdownMode, "--privacy-mode", privacyMode];
   const repoArgs = ["--vault", vault, ...repoPaths.flatMap((repoPath) => ["--input", repoPath])];
@@ -308,11 +327,12 @@ async function runRefresh(argv, args) {
     if (selectedSources.includes("whatsapp")) console.log(`  sync WhatsApp Mac: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
     if (selectedSources.includes("whatsapp-web")) console.log(`  sync WhatsApp Desktop/Web: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
     if (selectedSources.includes("imessage")) console.log(`  sync iMessage: days=${days}, markdown=${markdownMode}, privacy=${privacyMode}`);
-    if (selectedSources.includes("slack")) console.log("  Slack: import-only; run digital-brain import-slack --input <export.zip>");
-    if (selectedSources.includes("teams")) console.log("  Microsoft Teams: import-only; run digital-brain import-teams --input <export.zip|folder>");
-    if (selectedSources.includes("linkedin")) console.log("  LinkedIn: import-only; run digital-brain import-linkedin --input <archive.zip>");
-    if (selectedSources.includes("gmail")) console.log("  Gmail: import-only; run digital-brain import-gmail --input <takeout.mbox|takeout.zip>");
-    if (selectedSources.includes("calendar")) console.log("  Google Calendar: import-only; run digital-brain import-calendar --input <calendar.ics|takeout.zip>");
+    for (const source of Object.keys(IMPORT_SOURCES)) {
+      if (!selectedSources.includes(source)) continue;
+      const inputs = sourceInputs[source] || [];
+      const spec = IMPORT_SOURCES[source];
+      console.log(inputs.length ? `  import ${spec.label}: ${inputs.length} configured input(s)` : `  import ${spec.label}: no input saved yet; add during init or pass --${spec.arg}`);
+    }
     if (selectedSources.includes("repos")) console.log(repoPaths.length ? `  repos: ${repoPaths.length} configured path(s)` : "  repos: no paths configured; run digital-brain import-repos --input <repo>");
     console.log(`  extract relationships: days=${days}`);
     console.log(`  interpret relationship drafts: days=${days}`);
@@ -323,6 +343,17 @@ async function runRefresh(argv, args) {
   if (selectedSources.includes("whatsapp")) steps.push(["sync WhatsApp Mac", "sync-whatsapp", "digital_brain_whatsapp_mac_sync.py", syncArgs]);
   if (selectedSources.includes("whatsapp-web")) steps.push(["sync WhatsApp Desktop/Web", "sync-whatsapp-web", "whatsapp-web/sync.mjs", syncArgs]);
   if (selectedSources.includes("imessage")) steps.push(["sync iMessage", "sync-imessage", "digital_brain_imessage_sync.py", syncArgs]);
+  for (const source of Object.keys(IMPORT_SOURCES)) {
+    if (!selectedSources.includes(source)) continue;
+    const inputs = sourceInputs[source] || [];
+    if (!inputs.length) {
+      console.log(`\n→ import ${IMPORT_SOURCES[source].label} skipped: no input configured`);
+      continue;
+    }
+    for (const input of inputs) {
+      steps.push([`import ${IMPORT_SOURCES[source].label}`, `import-${source}`, IMPORT_SOURCES[source].script, importArgsForSource(source, input, { vault, days, privacyMode, markdownMode, config, args })]);
+    }
+  }
   if (selectedSources.includes("repos") && repoPaths.length) steps.push(["import repos", "import-repos", "digital_brain_repo_context_import.py", repoArgs]);
   if (selectedSources.includes("repos") && !repoPaths.length) console.log("\n→ import repos skipped: no repoPaths configured");
   steps.push(
@@ -380,6 +411,11 @@ function runNodeStep(script, argv) {
 
 function runNode(script, argv) {
   const result = spawnSync(process.execPath, [path.join(root, script), ...withVault(argv)], { stdio: "inherit" });
+  process.exit(result.status ?? 1);
+}
+
+function runNodeRaw(script, argv) {
+  const result = spawnSync(process.execPath, [path.join(root, script), ...argv], { stdio: "inherit" });
   process.exit(result.status ?? 1);
 }
 
@@ -518,7 +554,8 @@ function printSetupCheck(vault, options = {}) {
       optional: true,
     },
   ];
-  if (config.autoReplyProvider === "openai") {
+  const configuredProvider = normalizeProvider(config.autoReplyProvider);
+  if (configuredProvider === "openai") {
     checks.push({
       label: "OpenAI API key",
       ok: Boolean(process.env.OPENAI_API_KEY || config.openaiApiKey),
@@ -526,7 +563,7 @@ function printSetupCheck(vault, options = {}) {
       hint: "Set OPENAI_API_KEY or re-run init and choose OpenAI API.",
     });
   }
-  if (config.autoReplyProvider === "anthropic") {
+  if (configuredProvider === "anthropic") {
     checks.push({
       label: "Anthropic API key",
       ok: Boolean(process.env.ANTHROPIC_API_KEY || config.anthropicApiKey),
@@ -534,12 +571,12 @@ function printSetupCheck(vault, options = {}) {
       hint: "Set ANTHROPIC_API_KEY or re-run init and choose Anthropic API.",
     });
   }
-  if (config.autoReplyProvider === "xai") {
+  if (configuredProvider === "xai") {
     checks.push({
       label: "xAI API key",
-      ok: Boolean(process.env.XAI_API_KEY || config.xaiApiKey),
-      value: process.env.XAI_API_KEY ? "found in XAI_API_KEY" : config.xaiApiKey ? "stored in vault config" : "not found",
-      hint: "Set XAI_API_KEY or re-run init and choose xAI API.",
+      ok: Boolean(process.env.XAI_API_KEY || process.env.XCI_API_KEY || config.xaiApiKey),
+      value: process.env.XAI_API_KEY ? "found in XAI_API_KEY" : process.env.XCI_API_KEY ? "found in XCI_API_KEY" : config.xaiApiKey ? "stored in vault config" : "not found",
+      hint: "Set XAI_API_KEY, XCI_API_KEY, or re-run init and choose xAI API.",
     });
   }
   if (selectedSources.includes("whatsapp")) {
@@ -674,7 +711,9 @@ function printSetupCheck(vault, options = {}) {
 }
 
 function writeConfig(vault, config) {
-  writeFileAtomic(path.join(vault, "digital-brain.config.json"), `${JSON.stringify(config, null, 2)}\n`);
+  const configPath = path.join(vault, "digital-brain.config.json");
+  writeFileAtomic(configPath, `${JSON.stringify(config, null, 2)}\n`);
+  chmodOwnerOnly(configPath);
 }
 
 function writeRefreshScript(vault, config) {
@@ -784,26 +823,55 @@ function writeFileAtomic(file, content) {
   fs.renameSync(temp, file);
 }
 
+function chmodOwnerOnly(file) {
+  if (process.platform === "win32") return;
+  try {
+    fs.chmodSync(file, 0o600);
+  } catch {
+    // Best effort only: some filesystems do not support POSIX modes.
+  }
+}
+
 function printSetupHeader(defaultVault) {
   console.log("");
   console.log("╭────────────────────────────────────────╮");
   console.log("│ 🧠 Digital Brain setup                 │");
   console.log("╰────────────────────────────────────────╯");
   console.log("Pick with A/B/C, 1/2/3, exact value, or press Enter for the default.");
+  console.log("Press ← (left arrow) on any question to cancel setup without saving.");
   console.log(`Skipping the vault path creates: ${defaultVault}`);
   console.log("");
 }
 
+const SETUP_CANCEL_WORDS = ["proceed", "p", "omit", "yes", "y"];
+
+async function confirmOmitOrRetry(rl, retry) {
+  console.log("");
+  const choice = (await rl.question("✋ Omit setup? It will not be saved. [proceed/cancel]: ")).trim().toLowerCase();
+  if (SETUP_CANCEL_WORDS.includes(choice)) {
+    console.log("Setup cancelled — nothing was saved.");
+    rl.close();
+    process.exit(0);
+  }
+  return retry();
+}
+
+async function askLine(rl, query) {
+  const result = await askCancelable(rl, query);
+  if (!result.cancelled) return result.value;
+  return confirmOmitOrRetry(rl, () => askLine(rl, query));
+}
+
 async function ask(rl, label, fallback, helpText = "") {
   if (helpText) console.log(`  ${helpText}`);
-  const answer = await rl.question(`${label} [${fallback}]: `);
+  const answer = await askLine(rl, `${label} [${fallback}]: `);
   return answer.trim() || fallback;
 }
 
 async function askSecret(rl, label, options = {}) {
   if (options.helpText) console.log(`  ${options.helpText}`);
   const suffix = options.fallbackLabel ? ` [${options.fallbackLabel}]` : "";
-  const answer = await rl.question(`${label}${suffix}: `);
+  const answer = await askLine(rl, `${label}${suffix}: `);
   return answer.trim();
 }
 
@@ -818,6 +886,15 @@ async function askNumber(rl, label, fallback, options = {}) {
 
 async function select(rl, label, options, fallback) {
   const defaultIndex = Math.max(0, options.findIndex(([value]) => value === fallback));
+  if (process.stdin.isTTY) {
+    const result = await chooseInteractive({
+      label,
+      options: options.map(([, title, description, icon = "•"]) => ({ title: `${icon}  ${title}`, description })),
+      defaultIndex,
+    });
+    if (result.cancelled) return confirmOmitOrRetry(rl, () => select(rl, label, options, fallback));
+    return options[result.index][0];
+  }
   console.log("");
   console.log(`◇ ${label}`);
   options.forEach(([, title, description, icon = "•"], index) => {
@@ -826,7 +903,7 @@ async function select(rl, label, options, fallback) {
     console.log(`  ${letter}) ${icon}  ${title}${marker}`);
     console.log(`     ${description}`);
   });
-  const answer = await rl.question(`Choose ${letterFor(defaultIndex)}/${defaultIndex + 1} [${letterFor(defaultIndex)}]: `);
+  const answer = await askLine(rl, `Choose ${letterFor(defaultIndex)}/${defaultIndex + 1} [${letterFor(defaultIndex)}]: `);
   const trimmed = answer.trim();
   if (!trimmed) return options[defaultIndex][0];
   const letterIndex = indexFromLetter(trimmed);
@@ -840,6 +917,20 @@ async function select(rl, label, options, fallback) {
 
 async function multiSelect(rl, label, options, fallbackValues) {
   const fallback = fallbackValues.length ? fallbackValues : [options[0][0]];
+  if (process.stdin.isTTY) {
+    const defaultSelected = options
+      .map(([value], index) => (fallback.includes(value) ? index : -1))
+      .filter((index) => index >= 0);
+    const result = await chooseInteractive({
+      label,
+      options: options.map(([, title, description, icon = "•"]) => ({ title: `${icon}  ${title}`, description })),
+      multi: true,
+      defaultSelected,
+    });
+    if (result.cancelled) return confirmOmitOrRetry(rl, () => multiSelect(rl, label, options, fallbackValues));
+    const chosen = result.values.map((index) => options[index][0]);
+    return chosen.length ? chosen : fallback;
+  }
   console.log("");
   console.log(`◇ ${label}`);
   options.forEach(([, title, description, icon = "•"], index) => {
@@ -848,7 +939,7 @@ async function multiSelect(rl, label, options, fallbackValues) {
     console.log(`  ${letter}) ${icon}  ${title}${selected}`);
     console.log(`     ${description}`);
   });
-  const answer = await rl.question(`Choose one or more, comma-separated [${fallback.join(",")}]: `);
+  const answer = await askLine(rl, `Choose one or more, comma-separated [${fallback.join(",")}]: `);
   if (!answer.trim()) return fallback;
   const values = [];
   for (const token of answer.split(",").map((value) => value.trim()).filter(Boolean)) {
@@ -862,7 +953,7 @@ async function multiSelect(rl, label, options, fallbackValues) {
 
 async function confirm(rl, label, fallback) {
   const hint = fallback ? "Y/n" : "y/N";
-  const answer = (await rl.question(`${label} [${hint}]: `)).trim().toLowerCase();
+  const answer = (await askLine(rl, `${label} [${hint}]: `)).trim().toLowerCase();
   if (!answer) return fallback;
   return ["y", "yes", "true", "1"].includes(answer);
 }
@@ -935,6 +1026,61 @@ async function configureRepositoryContext(rl, args, existingRepoPaths) {
     if (localPath) paths.push(localPath);
   }
   return paths.length ? paths : existingRepoPaths;
+}
+
+async function configureImportSourceInputs(rl, selectedSources, existingInputs) {
+  const next = { ...existingInputs };
+  for (const [source, spec] of Object.entries(IMPORT_SOURCES)) {
+    if (!selectedSources.includes(source)) continue;
+    const current = next[source] || [];
+    const answer = await ask(
+      rl,
+      `${spec.label} input`,
+      current.join(", "),
+      `${spec.hint}. Leave blank to connect later; run will skip it until configured.`,
+    );
+    next[source] = parseList(answer);
+  }
+  return next;
+}
+
+function sourceInputsFromArgs(args) {
+  const inputs = {};
+  for (const [source, spec] of Object.entries(IMPORT_SOURCES)) {
+    inputs[source] = parseList(args[spec.arg] || args[`${source}-inputs`] || "");
+  }
+  if (args.input) {
+    for (const source of parseSources(args.sources || "")) {
+      if (IMPORT_SOURCES[source]) inputs[source] = parseList(args.input);
+    }
+  }
+  return Object.fromEntries(Object.entries(inputs).filter(([, values]) => values.length));
+}
+
+function mergeSourceInputs(base, override) {
+  const merged = {};
+  for (const source of Object.keys(IMPORT_SOURCES)) {
+    merged[source] = parseList(override[source] || "").length ? parseList(override[source]) : parseList(base[source] || "");
+  }
+  return merged;
+}
+
+function importArgsForSource(source, input, context) {
+  const spec = IMPORT_SOURCES[source];
+  const stepArgs = ["--vault", context.vault, "--input", input];
+  if (spec.calendarWindow) {
+    stepArgs.push("--past-days", String(context.args["past-days"] || context.days), "--future-days", String(context.args["future-days"] || context.days));
+    return stepArgs;
+  }
+  stepArgs.push("--days", String(context.days));
+  if (spec.selfEmail) {
+    const selfEmail = context.args["self-email"] || context.config.selfEmail || context.config.email || "";
+    if (selfEmail) stepArgs.push("--self-email", selfEmail);
+  }
+  if (spec.privacy) stepArgs.push("--privacy-mode", context.privacyMode);
+  if (spec.markdown) stepArgs.push("--markdown-mode", context.markdownMode);
+  if (source === "teams") stepArgs.push("--self-name", context.config.selfName || "Me");
+  return stepArgs;
 }
 
 function commandExists(command) {
@@ -1044,17 +1190,37 @@ function parseList(value) {
   return String(value).split(",").map((item) => item.trim()).filter(Boolean);
 }
 
+function parseSources(value) {
+  const selected = parseList(value);
+  if (!selected.length) return [];
+  const expanded = selected.flatMap((source) => source === "all" ? ALL_SOURCES : [source]);
+  return Array.from(new Set(expanded.filter((source) => ALL_SOURCES.includes(source))));
+}
+
 function defaultModelForProvider(provider) {
-  return PROVIDERS[provider]?.model || PROVIDERS.ollama.model;
+  return PROVIDERS[normalizeProvider(provider)]?.model || PROVIDERS.ollama.model;
 }
 
 function providerSpecificModelArg(args, provider) {
-  const key = PROVIDERS[provider]?.modelArg;
-  return key ? args[key] : "";
+  const meta = PROVIDERS[normalizeProvider(provider)];
+  if (!meta) return "";
+  return args[meta.modelArg] || args[meta.modelArgAlias] || "";
 }
 
 function providerUsesModel(provider) {
-  return Boolean(PROVIDERS[provider]?.model);
+  return Boolean(PROVIDERS[normalizeProvider(provider)]?.model);
+}
+
+function normalizeProvider(provider) {
+  return provider === "xci" ? "xai" : provider;
+}
+
+function providerEnvFound(providerMeta) {
+  return Boolean(process.env[providerMeta.keyEnv] || (providerMeta.keyEnvAlias && process.env[providerMeta.keyEnvAlias]));
+}
+
+function providerEnvLabel(providerMeta) {
+  return [providerMeta.keyEnv, providerMeta.keyEnvAlias].filter(Boolean).join(" or ");
 }
 
 function toBoolean(value) {
@@ -1128,31 +1294,30 @@ function help() {
   console.log(`Digital Brain
 
 Usage:
+  digital-brain
+  digital-brain ui
   digital-brain init [vault]
   digital-brain run
+  digital-brain ingest
+  digital-brain run --sources all
+  digital-brain run --sources slack --slack-input slack-export.zip
+  digital-brain graph-ai
+  digital-brain graph-ai --provider anthropic --yes
   digital-brain demo-proof --out ./demo-assets
-  digital-brain showcase --out ./demo-assets
   digital-brain doctor
   digital-brain tutorial
-  digital-brain sync-whatsapp --days 30
-  digital-brain sync-whatsapp-web --days 30
-  digital-brain sync-imessage --days 30
-  digital-brain import-slack --input slack-export.zip
-  digital-brain import-teams --input teams-export.zip
-  digital-brain import-linkedin --input linkedin-archive.zip
-  digital-brain import-gmail --input takeout.mbox
-  digital-brain import-calendar --input calendar.ics
-  digital-brain import-repos --input /path/to/repo --input /path/to/another-repo
-  digital-brain connect-repos
-  digital-brain extract --days 30
-  digital-brain interpret --days 30
   digital-brain send-whatsapp --to "Name" --message "Text" [--yes]
   digital-brain send-slack --channel C123 --message "Text" [--yes]
   digital-brain send-teams --chat 19:abc --message "Text" [--yes]
   digital-brain send-imessage --to "+15551234567" --message "Text" [--yes]
-  digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|anthropic|xai|codex|codex-app --model llama3.1 [--reply-style-mode match-user|casual-imperfect|clean-formal] [--yes]
+  digital-brain auto-whatsapp --allow "Name" --contact "+15551234567" --provider ollama|openai|anthropic|xai|xci|codex|codex-app --model llama3.1 [--reply-style-mode match-user|casual-imperfect|clean-formal] [--yes]
   digital-brain pause-whatsapp [--chat "Name"]
   digital-brain resume-whatsapp [--chat "Name"]
   digital-brain whatsapp-status
+
+Advanced/debug commands still work:
+  sync-whatsapp, sync-whatsapp-web, sync-imessage
+  import-slack, import-teams, import-linkedin, import-gmail, import-calendar, import-repos
+  connect-repos, extract, interpret, showcase
 `);
 }

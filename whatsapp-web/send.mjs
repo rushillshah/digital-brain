@@ -27,7 +27,7 @@ if (!args.yes) {
 
 const client = new Client({
   authStrategy: new LocalAuth({ clientId: "digital-brain", dataPath: sessionDir }),
-  puppeteer: { headless: false, args: ["--no-sandbox", "--disable-setuid-sandbox"] },
+  puppeteer: { headless: false, args: browserArgs() },
 });
 
 client.on("qr", (qr) => {
@@ -168,4 +168,10 @@ function readConfig(vaultPath) {
 
 function hash(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+function browserArgs() {
+  return process.env.DIGITAL_BRAIN_CHROME_NO_SANDBOX === "1"
+    ? ["--no-sandbox", "--disable-setuid-sandbox"]
+    : [];
 }

@@ -56,6 +56,10 @@ test("init writes configured vault files and scripts", () => {
   assert.equal(config.responsibilityAccepted, true);
   assert.equal(config.defaults.minimumRefreshIntervalMinutes, 1);
   assert.equal(config.disclosureRule.discloseAfterAiAssistedSends, 2);
+  if (process.platform !== "win32") {
+    const mode = fs.statSync(path.join(vault, "digital-brain.config.json")).mode & 0o777;
+    assert.equal(mode, 0o600);
+  }
 
   assert.match(read(path.join(vault, "Tools", "digital-brain-refresh.sh")), /--days "\$DAYS"/);
   assert.match(read(path.join(vault, "Tools", "digital-brain-refresh.sh")), /digital-brain run/);
@@ -197,6 +201,27 @@ test("init can configure xAI auto-reply provider and key", () => {
   assert.equal(config.xaiApiKey, "test-xai-key");
 });
 
+test("init accepts xci aliases for the xAI provider and key", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  run([
+    cli,
+    "init",
+    vault,
+    "--yes",
+    "--auto-reply-provider",
+    "xci",
+    "--xci-api-key",
+    "test-xci-key",
+    "--connect-ai=false",
+  ], { HOME: testHome(root) });
+
+  const config = readJson(path.join(vault, "digital-brain.config.json"));
+  assert.equal(config.autoReplyProvider, "xai");
+  assert.equal(config.autoReplyModel, "grok-4.3");
+  assert.equal(config.xaiApiKey, "test-xci-key");
+});
+
 test("init can opt into anonymous telemetry without content", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
@@ -295,7 +320,7 @@ test("sample extractor and interpreter produce relationship memory", () => {
   assert.equal(typeof mom.typingStyle.signature, "string");
   assert.equal(typeof mom.typingStyle.avgWords, "number");
 
-  const interpreted = read(path.join(vault, "06 AI Memory", "Generated Relationship Drafts", "Mom (WhatsApp).md"));
+  const interpreted = read(path.join(vault, "04 People", "Generated", "Mom (WhatsApp).md"));
   assert.match(interpreted, /## Typing Style To Match/);
   assert.match(interpreted, /## Reply Guidance/);
   assert.match(interpreted, /Generated draft/);
@@ -369,7 +394,7 @@ test("interpreter infers roles from conversation evidence, not just contact name
   assert.equal(profile.roleEvidenceScores.sibling, 5);
   assert.ok(profile.roleEvidence.some((item) => item.signal === "explicit second-person kinship"));
 
-  const interpreted = read(path.join(vault, "06 AI Memory", "Generated Relationship Drafts", "Avery (WhatsApp).md"));
+  const interpreted = read(path.join(vault, "04 People", "Generated", "Avery (WhatsApp).md"));
   assert.match(interpreted, /Role: sibling/);
   assert.match(interpreted, /conversation evidence/);
   assert.match(interpreted, /Role Evidence From Conversation/);
@@ -456,7 +481,7 @@ test("run dry-run uses selected sources and import guidance", () => {
 
   assert.match(result.stdout, /sync iMessage/);
   assert.match(result.stdout, /sync WhatsApp Desktop\/Web/);
-  assert.match(result.stdout, /Slack: import-only/);
+  assert.match(result.stdout, /import Slack: no input saved yet/);
   assert.doesNotMatch(result.stdout, /sync WhatsApp Mac/);
 });
 
@@ -466,6 +491,55 @@ test("tutorial prints setup guidance", () => {
   assert.match(result.stdout, /Setup check/);
   assert.match(result.stdout, /No pip install is needed/);
   assert.match(result.stdout, /digital-brain init/);
+});
+
+test("default command is the terminal UI while help remains scriptable", () => {
+  const source = read(path.join(repo, "bin", "digital-brain.js"));
+  const uiSource = read(path.join(repo, "lib", "ui.js"));
+  const help = run([cli, "help"], { HOME: testHome(tempDir()) });
+  const noTty = runRaw([cli], { HOME: testHome(tempDir()) });
+
+  assert.match(source, /command = "ui"/);
+  assert.match(source, /lib\/ui\.js/);
+  assert.match(uiSource, /↑↓ move/);
+  assert.match(uiSource, /Connect or toggle sources/);
+  assert.match(uiSource, /Send a draft\/test message/);
+  assert.match(help.stdout, /Usage:/);
+  assert.match(help.stdout, /digital-brain ui/);
+  assert.notEqual(noTty.status, 0);
+  assert.match(`${noTty.stdout}\n${noTty.stderr}`, /interactive terminal/);
+});
+
+test("graph-ai estimates one-time AI graph review cost without an API key", () => {
+  const root = tempDir();
+  const vault = path.join(root, "sample-vault");
+  fs.cpSync(path.join(repo, "examples", "sample-vault"), vault, { recursive: true });
+
+  const result = run([cli, "graph-ai", "--vault", vault, "--provider", "xci", "--output-tokens", "2000"]);
+
+  assert.match(result.stdout, /AI graph review estimate/);
+  assert.match(result.stdout, /Provider\/model: xAI \/ grok-4\.3/);
+  assert.match(result.stdout, /Estimated input tokens:/);
+  assert.match(result.stdout, /Estimated cost:/);
+  assert.match(result.stdout, /Estimate only/);
+  assert.ok(!fs.existsSync(path.join(vault, "06 AI Memory", "AI Graph Review.md")));
+});
+
+test("graph-ai caps the pulled graph bundle before provider calls", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const memoryDir = path.join(vault, "06 AI Memory");
+  fs.mkdirSync(memoryDir, { recursive: true });
+  fs.writeFileSync(path.join(vault, "digital-brain.config.json"), "{}");
+  for (let i = 0; i < 20; i += 1) {
+    fs.writeFileSync(path.join(memoryDir, `Large ${i}.md`), `# Large ${i}\n\n${"relationship context ".repeat(1000)}\n`);
+  }
+
+  const result = run([cli, "graph-ai", "--vault", vault, "--provider", "anthropic", "--max-input-tokens", "2500"]);
+
+  assert.match(result.stdout, /Files skipped by token cap: [1-9]/);
+  assert.match(result.stdout, /Estimate only/);
+  assert.ok(!fs.existsSync(path.join(vault, "06 AI Memory", "AI Graph Review.md")));
 });
 
 test("auto-whatsapp requires an explicit allowlist", () => {
@@ -490,6 +564,8 @@ test("whatsapp web desktop sync is wired as a cross-platform source", () => {
   assert.match(syncSource, /WhatsApp Web\/Desktop linked device/);
   assert.match(syncSource, /limit-per-chat/);
   assert.match(syncSource, /web-seen-message-ids\.json/);
+  assert.match(syncSource, /args: browserArgs\(\)/);
+  assert.match(syncSource, /DIGITAL_BRAIN_CHROME_NO_SANDBOX/);
   assert.match(desktopSource, /whatsapp-web/);
 });
 
@@ -539,8 +615,31 @@ test("auto-reply prompt keeps WhatsApp replies terse and non-assistant-like", ()
   assert.match(source, /grok-4\.3/);
   assert.match(source, /ANTHROPIC_API_KEY/);
   assert.match(source, /XAI_API_KEY/);
+  assert.match(source, /XCI_API_KEY/);
+  assert.match(source, /xci-api-key/);
+  assert.match(source, /normalizeProvider/);
   assert.match(source, /https:\/\/api\.anthropic\.com\/v1\/messages/);
   assert.match(source, /https:\/\/api\.x\.ai\/v1\/responses/);
+  assert.match(source, /shell: false/);
+  assert.match(source, /splitCommand/);
+  assert.match(source, /args: browserArgs\(\)/);
+  assert.match(source, /DIGITAL_BRAIN_CHROME_NO_SANDBOX/);
+  assert.doesNotMatch(source, /shell: true/);
+});
+
+test("graph-ai is wired for one-time provider-backed graph review", () => {
+  const source = read(path.join(repo, "lib", "graph-ai.js"));
+  const cliSource = read(path.join(repo, "bin", "digital-brain.js"));
+  assert.match(cliSource, /graph-ai/);
+  assert.match(source, /AI graph review estimate/);
+  assert.match(source, /max-input-tokens/);
+  assert.match(source, /input-cost-per-1m/);
+  assert.match(source, /output-cost-per-1m/);
+  assert.match(source, /AI Graph Review\.md/);
+  assert.match(source, /Graph Index\.md/);
+  assert.match(source, /https:\/\/api\.anthropic\.com\/v1\/messages/);
+  assert.match(source, /https:\/\/api\.x\.ai\/v1\/responses/);
+  assert.match(source, /https:\/\/api\.openai\.com\/v1\/responses/);
 });
 
 test("auto-reply allows explicitly whitelisted groups by name", () => {
@@ -837,6 +936,23 @@ test("extract skips corrupt JSONL and keeps valid records", () => {
   assert.ok(profiles.some((profile) => profile.chatName === "Corrupt Test"));
 });
 
+test("importers reject unsafe zip member paths", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const archive = path.join(root, "unsafe-slack.zip");
+  const outside = path.join(root, "evil.json");
+  createZip(archive, {
+    "users.json": "[]",
+    "../evil.json": "[]",
+  });
+
+  const result = runRaw([cli, "import-slack", "--vault", vault, "--input", archive], { HOME: testHome(root) });
+
+  assert.notEqual(result.status, 0);
+  assert.match(`${result.stdout}\n${result.stderr}`, /Unsafe archive member path|escapes destination/);
+  assert.equal(fs.existsSync(outside), false);
+});
+
 test("sync-imessage imports from a local Messages-style database", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
@@ -955,5 +1071,19 @@ conn.commit()
 conn.close()
 `;
   const result = spawnSync("python3", ["-c", code, db], { encoding: "utf8" });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+}
+
+function createZip(file, entries) {
+  const payload = Buffer.from(JSON.stringify(entries), "utf8").toString("base64");
+  const code = `
+import base64, json, sys, zipfile
+file = sys.argv[1]
+entries = json.loads(base64.b64decode(sys.argv[2]).decode())
+with zipfile.ZipFile(file, "w") as archive:
+    for name, content in entries.items():
+        archive.writestr(name, content)
+`;
+  const result = spawnSync("python3", ["-c", code, file, payload], { encoding: "utf8" });
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 }
