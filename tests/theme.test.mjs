@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createTheme, detectColor } from "../lib/theme.js";
+import {
+  createTheme,
+  detectColor,
+  visibleWidth,
+  padVisible,
+  truncateVisible,
+} from "../lib/theme.js";
 
 test("color helpers wrap text in ANSI codes when enabled", () => {
   const theme = createTheme(true);
@@ -31,4 +37,36 @@ test("detectColor is false when NO_COLOR is set", () => {
   assert.equal(detectColor({ NO_COLOR: "1" }, true), false);
   assert.equal(detectColor({}, true), true);
   assert.equal(detectColor({}, false), false);
+});
+
+test("visibleWidth ignores ANSI escape codes", () => {
+  const theme = createTheme(true);
+  assert.equal(visibleWidth("hello"), 5);
+  assert.equal(visibleWidth(theme.purple("hello")), 5);
+  assert.equal(visibleWidth(theme.bold(theme.purple("hello"))), 5);
+});
+
+test("padVisible pads colored strings to the target visible width", () => {
+  const theme = createTheme(true);
+  assert.equal(visibleWidth(padVisible(theme.green("ok"), 6)), 6);
+  assert.equal(padVisible("ok", 6), "ok    ");
+  assert.equal(padVisible("toolong", 3), "toolong");
+});
+
+test("truncateVisible leaves short strings alone", () => {
+  assert.equal(truncateVisible("short", 10), "short");
+});
+
+test("truncateVisible cuts to width and appends ellipsis", () => {
+  const out = truncateVisible("a".repeat(20), 10);
+  assert.equal(out, "aaaaaaaaa…");
+  assert.equal(visibleWidth(out), 10);
+});
+
+test("truncateVisible preserves ANSI codes and resets styles", () => {
+  const theme = createTheme(true);
+  const out = truncateVisible(theme.purple("a".repeat(20)), 10);
+  assert.equal(visibleWidth(out), 10);
+  assert.ok(out.startsWith("\x1b[38;5;141m"));
+  assert.ok(out.endsWith("\x1b[0m…"));
 });
