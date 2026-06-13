@@ -6,7 +6,7 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 import { copyDir, ensureDir, packageRoot, resolveVault, writeDefaultVault } from "../lib/fs.js";
-import { askCancelable } from "../lib/prompt.js";
+import { askCancelable, chooseInteractive } from "../lib/prompt.js";
 import { emitTelemetry, readTelemetryPreference, writeTelemetryPreference } from "../lib/telemetry.js";
 
 const root = packageRoot(import.meta.url);
@@ -845,9 +845,7 @@ function printSetupHeader(defaultVault) {
 
 const SETUP_CANCEL_WORDS = ["proceed", "p", "omit", "yes", "y"];
 
-async function askLine(rl, query) {
-  const result = await askCancelable(rl, query);
-  if (!result.cancelled) return result.value;
+async function confirmOmitOrRetry(rl, retry) {
   console.log("");
   const choice = (await rl.question("✋ Omit setup? It will not be saved. [proceed/cancel]: ")).trim().toLowerCase();
   if (SETUP_CANCEL_WORDS.includes(choice)) {
@@ -855,7 +853,13 @@ async function askLine(rl, query) {
     rl.close();
     process.exit(0);
   }
-  return askLine(rl, query);
+  return retry();
+}
+
+async function askLine(rl, query) {
+  const result = await askCancelable(rl, query);
+  if (!result.cancelled) return result.value;
+  return confirmOmitOrRetry(rl, () => askLine(rl, query));
 }
 
 async function ask(rl, label, fallback, helpText = "") {
@@ -882,6 +886,15 @@ async function askNumber(rl, label, fallback, options = {}) {
 
 async function select(rl, label, options, fallback) {
   const defaultIndex = Math.max(0, options.findIndex(([value]) => value === fallback));
+  if (process.stdin.isTTY) {
+    const result = await chooseInteractive({
+      label,
+      options: options.map(([, title, description, icon = "•"]) => ({ title: `${icon}  ${title}`, description })),
+      defaultIndex,
+    });
+    if (result.cancelled) return confirmOmitOrRetry(rl, () => select(rl, label, options, fallback));
+    return options[result.index][0];
+  }
   console.log("");
   console.log(`◇ ${label}`);
   options.forEach(([, title, description, icon = "•"], index) => {
@@ -904,6 +917,20 @@ async function select(rl, label, options, fallback) {
 
 async function multiSelect(rl, label, options, fallbackValues) {
   const fallback = fallbackValues.length ? fallbackValues : [options[0][0]];
+  if (process.stdin.isTTY) {
+    const defaultSelected = options
+      .map(([value], index) => (fallback.includes(value) ? index : -1))
+      .filter((index) => index >= 0);
+    const result = await chooseInteractive({
+      label,
+      options: options.map(([, title, description, icon = "•"]) => ({ title: `${icon}  ${title}`, description })),
+      multi: true,
+      defaultSelected,
+    });
+    if (result.cancelled) return confirmOmitOrRetry(rl, () => multiSelect(rl, label, options, fallbackValues));
+    const chosen = result.values.map((index) => options[index][0]);
+    return chosen.length ? chosen : fallback;
+  }
   console.log("");
   console.log(`◇ ${label}`);
   options.forEach(([, title, description, icon = "•"], index) => {
