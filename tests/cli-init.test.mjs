@@ -501,7 +501,7 @@ test("default command is the terminal UI while help remains scriptable", () => {
 
   assert.match(source, /command = "ui"/);
   assert.match(source, /lib\/ui\.js/);
-  assert.match(uiSource, /Keys: up\/down move/);
+  assert.match(uiSource, /↑↓ move/);
   assert.match(uiSource, /Connect or toggle sources/);
   assert.match(uiSource, /Send a draft\/test message/);
   assert.match(help.stdout, /Usage:/);
