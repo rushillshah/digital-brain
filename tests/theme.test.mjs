@@ -6,6 +6,10 @@ import {
   visibleWidth,
   padVisible,
   truncateVisible,
+  stripAnsi,
+  box,
+  sectionHeader,
+  layoutWidth,
 } from "../lib/theme.js";
 
 test("color helpers wrap text in ANSI codes when enabled", () => {
@@ -69,4 +73,37 @@ test("truncateVisible preserves ANSI codes and resets styles", () => {
   assert.equal(visibleWidth(out), 10);
   assert.ok(out.startsWith("\x1b[38;5;141m"));
   assert.ok(out.endsWith("\x1b[0m…"));
+});
+
+test("layoutWidth clamps to [60, 100] with one column of margin", () => {
+  assert.equal(layoutWidth(40), 60);
+  assert.equal(layoutWidth(81), 80);
+  assert.equal(layoutWidth(500), 100);
+  assert.equal(layoutWidth(undefined), 79);
+});
+
+test("box renders rounded borders with uniform visible width", () => {
+  const theme = createTheme(true);
+  const out = box(["short", theme.purple("colored")], { width: 40, theme });
+  const lines = out.split("\n");
+  assert.equal(lines.length, 4);
+  for (const line of lines) assert.equal(visibleWidth(line), 40);
+  assert.ok(stripAnsi(lines[0]).startsWith("╭"));
+  assert.ok(stripAnsi(lines[0]).endsWith("╮"));
+  assert.ok(stripAnsi(lines[3]).startsWith("╰"));
+  assert.ok(stripAnsi(lines[3]).endsWith("╯"));
+});
+
+test("box truncates content wider than the box", () => {
+  const theme = createTheme(false);
+  const out = box(["x".repeat(100)], { width: 30, theme });
+  for (const line of out.split("\n")) assert.equal(visibleWidth(line), 30);
+  assert.ok(out.includes("…"));
+});
+
+test("sectionHeader rules out to the full width", () => {
+  const theme = createTheme(true);
+  const header = sectionHeader("Sources", 50, theme);
+  assert.equal(visibleWidth(header), 50);
+  assert.ok(stripAnsi(header).startsWith(" Sources ─"));
 });
