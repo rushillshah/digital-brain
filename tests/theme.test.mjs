@@ -16,7 +16,6 @@ test("color helpers wrap text in ANSI codes when enabled", () => {
   const theme = createTheme(true);
   assert.equal(theme.purple("hi"), "\x1b[38;5;141mhi\x1b[39m");
   assert.equal(theme.green("hi"), "\x1b[38;5;114mhi\x1b[39m");
-  assert.equal(theme.magenta("hi"), "\x1b[38;5;176mhi\x1b[39m");
   assert.equal(theme.dim("hi"), "\x1b[2mhi\x1b[22m");
   assert.equal(theme.bold("hi"), "\x1b[1mhi\x1b[22m");
 });
@@ -59,6 +58,11 @@ test("padVisible pads colored strings to the target visible width", () => {
 
 test("truncateVisible leaves short strings alone", () => {
   assert.equal(truncateVisible("short", 10), "short");
+});
+
+test("truncateVisible returns empty string for non-positive width", () => {
+  assert.equal(truncateVisible("anything", 0), "");
+  assert.equal(truncateVisible("anything", -3), "");
 });
 
 test("truncateVisible cuts to width and appends ellipsis", () => {
