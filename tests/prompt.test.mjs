@@ -99,6 +99,43 @@ test("chooseInteractive multi toggles checkboxes and confirms", async () => {
   assert.deepEqual(await pending, { values: [0, 2] });
 });
 
+test("chooseInteractive detaches prior keypress listeners and restores them", async () => {
+  const input = new PassThrough();
+  const output = new PassThrough();
+  input.isTTY = true;
+  input.isRaw = true;
+  const rawCalls = [];
+  input.setRawMode = (value) => {
+    rawCalls.push(value);
+    input.isRaw = value;
+    return input;
+  };
+  let priorFired = 0;
+  const prior = () => {
+    priorFired += 1;
+  };
+  input.on("keypress", prior);
+
+  const pending = chooseInteractive({
+    label: "Pick",
+    options: [{ title: "a" }, { title: "b" }],
+    input,
+    output,
+  });
+  setImmediate(() => {
+    input.emit("keypress", "", { name: "down" });
+    input.emit("keypress", "", { name: "return" });
+  });
+
+  assert.deepEqual(await pending, { index: 1 });
+  assert.equal(priorFired, 0, "prior listener must be detached while the chooser runs");
+  assert.ok(
+    input.listeners("keypress").includes(prior),
+    "prior listener must be restored afterward",
+  );
+  assert.deepEqual(rawCalls, [true, true], "raw mode set on, then restored to wasRaw");
+});
+
 test("chooseInteractive cancels on left arrow", async () => {
   const input = new PassThrough();
   const output = new PassThrough();
