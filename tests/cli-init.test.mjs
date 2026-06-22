@@ -542,6 +542,37 @@ test("graph-ai caps the pulled graph bundle before provider calls", () => {
   assert.ok(!fs.existsSync(path.join(vault, "06 AI Memory", "AI Graph Review.md")));
 });
 
+test("graph-ai ignores malformed vault config on estimate-only runs", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const memoryDir = path.join(vault, "06 AI Memory");
+  fs.mkdirSync(memoryDir, { recursive: true });
+  fs.writeFileSync(path.join(vault, "digital-brain.config.json"), "{not valid json");
+  fs.writeFileSync(path.join(memoryDir, "Context.md"), "# Context\n\nUseful relationship context.\n");
+
+  const result = run([cli, "graph-ai", "--vault", vault, "--provider", "xci"]);
+
+  assert.match(result.stdout, /AI graph review estimate/);
+  assert.match(result.stdout, /Estimate only/);
+  assert.match(result.stderr, /Warning: ignoring invalid config/);
+});
+
+test("graph-ai keeps small max-chars-per-file truncation bounded", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const memoryDir = path.join(vault, "06 AI Memory");
+  fs.mkdirSync(memoryDir, { recursive: true });
+  fs.writeFileSync(path.join(vault, "digital-brain.config.json"), "{}");
+  fs.writeFileSync(path.join(memoryDir, "Long.md"), `# Long\n\n${"relationship context ".repeat(80)}\n`);
+
+  const result = run([cli, "graph-ai", "--vault", vault, "--provider", "xci", "--max-chars-per-file", "50"]);
+  const match = result.stdout.match(/Estimated input tokens: (\d+)/);
+
+  assert.ok(match, result.stdout);
+  assert.ok(Number(match[1]) < 1700, result.stdout);
+  assert.match(result.stdout, /Estimate only/);
+});
+
 test("auto-whatsapp requires an explicit allowlist", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
