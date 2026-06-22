@@ -16,7 +16,7 @@ def safe_extract_zip(archive, destination):
         raise ValueError(f"Refusing to extract archive larger than {MAX_UNCOMPRESSED_BYTES} bytes")
     for info in infos:
         validate_zip_member(info, destination)
-    archive.extractall(destination)
+        archive.extract(info, destination)
 
 
 def validate_zip_member(info, destination):

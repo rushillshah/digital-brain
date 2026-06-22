@@ -953,6 +953,13 @@ test("importers reject unsafe zip member paths", () => {
   assert.equal(fs.existsSync(outside), false);
 });
 
+test("safe zip extractor extracts validated members individually", () => {
+  const source = read(path.join(repo, "scripts", "digital_brain_safe_zip.py"));
+
+  assert.match(source, /archive\.extract\(info, destination\)/);
+  assert.doesNotMatch(source, /extractall/);
+});
+
 test("sync-imessage imports from a local Messages-style database", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
