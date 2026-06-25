@@ -510,6 +510,18 @@ test("default command is the terminal UI while help remains scriptable", () => {
   assert.match(`${noTty.stdout}\n${noTty.stderr}`, /interactive terminal/);
 });
 
+test("dashboard reuses a cached snapshot while rendering", () => {
+  const source = read(path.join(repo, "lib", "ui.js"));
+
+  assert.match(source, /snapshot: readSnapshot\(\)/);
+  assert.match(source, /function refreshSnapshot\(\)/);
+  assert.match(source, /const snapshot = state\.snapshot/);
+  assert.doesNotMatch(source, /function menuItems\(snapshot = readSnapshot\(\)\)/);
+  assert.doesNotMatch(source, /const snapshot = readSnapshot\(\);\n\s+const items = menuItems/);
+  assert.doesNotMatch(source, /runCommand\(\["run", "--vault", vaultPath\(\)\]\)/);
+  assert.doesNotMatch(source, /runCommand\(\["graph-ai", "--vault", vaultPath\(\)\]\)/);
+});
+
 test("graph-ai estimates one-time AI graph review cost without an API key", () => {
   const root = tempDir();
   const vault = path.join(root, "sample-vault");
