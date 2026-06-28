@@ -642,6 +642,14 @@ test("graph-ai is wired for one-time provider-backed graph review", () => {
   assert.match(source, /https:\/\/api\.openai\.com\/v1\/responses/);
 });
 
+test("dashboard config writes use the shared atomic writer", () => {
+  const source = read(path.join(repo, "lib", "ui.js"));
+  const writeConfigBody = source.match(/function writeConfig\(vault, config\) \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(source, /import \{ resolveVault, writeFileAtomic \} from "\.\/fs\.js";/);
+  assert.match(writeConfigBody, /writeFileAtomic\(file,/);
+  assert.doesNotMatch(writeConfigBody, /fs\.writeFileSync\(file,/);
+});
+
 test("auto-reply allows explicitly whitelisted groups by name", () => {
   const source = read(path.join(repo, "whatsapp-web", "auto-reply.mjs"));
   assert.match(source, /chat\.isGroup && !includeGroups && !isChatWhitelisted\(chat\)/);
