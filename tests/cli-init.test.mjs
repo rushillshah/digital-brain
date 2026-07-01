@@ -640,6 +640,9 @@ test("graph-ai is wired for one-time provider-backed graph review", () => {
   assert.match(source, /https:\/\/api\.anthropic\.com\/v1\/messages/);
   assert.match(source, /https:\/\/api\.x\.ai\/v1\/responses/);
   assert.match(source, /https:\/\/api\.openai\.com\/v1\/responses/);
+  assert.match(source, /const PROVIDERS =/);
+  assert.match(source, /function providerSpec/);
+  assert.match(source, /keySources/);
 });
 
 test("auto-reply allows explicitly whitelisted groups by name", () => {
