@@ -423,7 +423,7 @@ function pauseWhatsApp(argv, args) {
   const vault = getVaultFromArgs(argv);
   const file = pauseFile(vault);
   ensureDir(path.dirname(file));
-  const state = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { schemaVersion: 1, paused: false, pausedChats: {} };
+  const state = readPauseState(file);
   state.schemaVersion = 1;
   state.pausedChats ||= {};
   const chat = args.chat || args.name || "";
@@ -446,7 +446,7 @@ function pauseWhatsApp(argv, args) {
 function resumeWhatsApp(argv, args) {
   const vault = getVaultFromArgs(argv);
   const file = pauseFile(vault);
-  const state = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { schemaVersion: 1, paused: false, pausedChats: {} };
+  const state = readPauseState(file);
   state.schemaVersion = 1;
   state.pausedChats ||= {};
   const chat = args.chat || args.name || "";
@@ -465,7 +465,7 @@ function resumeWhatsApp(argv, args) {
 function whatsappStatus(argv) {
   const vault = getVaultFromArgs(argv);
   const file = pauseFile(vault);
-  const state = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { paused: false, pausedChats: {} };
+  const state = readPauseState(file);
   console.log(`WhatsApp auto-reply: ${state.paused ? "paused" : "running/not globally paused"}`);
   const pausedChats = Object.values(state.pausedChats || {});
   if (pausedChats.length) console.log(`Paused chats: ${pausedChats.map((chat) => chat.chatName).join(", ")}`);
@@ -493,6 +493,20 @@ function pauseFile(vault) {
   return path.join(vault, "08 Sources", "WhatsApp", "Outbound", "auto-reply-pause.json");
 }
 
+function defaultPauseState() {
+  return { schemaVersion: 1, paused: false, pausedChats: {} };
+}
+
+function readPauseState(file) {
+  if (!fs.existsSync(file)) return defaultPauseState();
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (error) {
+    console.warn(`Ignoring malformed WhatsApp pause state at ${file}: ${error.message}`);
+    return defaultPauseState();
+  }
+}
+
 function withVault(argv) {
   if (argv.includes("--vault") || argv.some((arg) => arg.startsWith("--vault="))) return argv;
   return ["--vault", getVaultFromArgs(argv), ...argv];
@@ -510,7 +524,13 @@ function readVaultConfig(vault) {
     console.error(`No Digital Brain vault found. Run "digital-brain init" first, or pass --vault <path>.`);
     process.exit(1);
   }
-  return JSON.parse(fs.readFileSync(file, "utf8"));
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (error) {
+    console.error(`Malformed Digital Brain config at ${file}: ${error.message}`);
+    console.error('Fix the JSON or re-run "digital-brain init" for this vault.');
+    process.exit(1);
+  }
 }
 
 function printSetupCheck(vault, options = {}) {
