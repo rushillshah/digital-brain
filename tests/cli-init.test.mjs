@@ -673,6 +673,35 @@ test("pause and resume commands write WhatsApp pause state", () => {
   assert.equal(pause.paused, false);
 });
 
+test("commands report malformed vault config clearly", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  fs.mkdirSync(vault, { recursive: true });
+  fs.writeFileSync(path.join(vault, "digital-brain.config.json"), "{bad json");
+
+  const result = runRaw([cli, "run", "--vault", vault, "--dry-run"], { HOME: testHome(root) });
+
+  assert.notEqual(result.status, 0);
+  assert.match(`${result.stdout}\n${result.stderr}`, /Malformed Digital Brain config/);
+  assert.match(`${result.stdout}\n${result.stderr}`, /re-run "digital-brain init"/);
+});
+
+test("whatsapp status ignores malformed pause state", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const home = testHome(root);
+  run([cli, "init", vault, "--yes", "--connect-ai=false"], { HOME: home });
+  const pausePath = path.join(vault, "08 Sources", "WhatsApp", "Outbound", "auto-reply-pause.json");
+  fs.mkdirSync(path.dirname(pausePath), { recursive: true });
+  fs.writeFileSync(pausePath, "{bad json");
+
+  const result = runRaw([cli, "whatsapp-status", "--vault", vault], { HOME: home });
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /WhatsApp auto-reply: running\/not globally paused/);
+  assert.match(result.stderr, /Ignoring malformed WhatsApp pause state/);
+});
+
 test("auto-whatsapp supports keyboard pause controls", () => {
   const source = read(path.join(repo, "whatsapp-web", "auto-reply.mjs"));
   assert.match(source, /Keyboard controls: Space toggles pause\/resume/);
