@@ -301,6 +301,22 @@ test("init writes global pointers when enabled", () => {
   assert.match(read(path.join(home, ".gemini", "GEMINI.md")), /Digital Brain vault:/);
 });
 
+test("doctor honors explicit vault path", () => {
+  const root = tempDir();
+  const home = testHome(root);
+  const cwdVault = path.join(root, "cwd", "Digital Brain Vault");
+  const targetVault = path.join(root, "Target Brain");
+  fs.mkdirSync(path.dirname(cwdVault), { recursive: true });
+
+  run([cli, "init", cwdVault, "--yes", "--self-name", "Wrong Vault", "--connect-ai=false"], { HOME: home });
+  run([cli, "init", targetVault, "--yes", "--self-name", "Target Vault", "--connect-ai=false"], { HOME: home });
+
+  const result = run([cli, "doctor", "--vault", targetVault], { HOME: home }, { cwd: path.dirname(cwdVault) });
+
+  assert.match(result.stdout, new RegExp(escapeRegExp(`Default vault: ${targetVault}`)));
+  assert.doesNotMatch(result.stdout, new RegExp(escapeRegExp(`Default vault: ${cwdVault}`)));
+});
+
 test("sample extractor and interpreter produce relationship memory", () => {
   const root = tempDir();
   const vault = path.join(root, "sample-vault");
@@ -1022,6 +1038,10 @@ function testHome(root) {
   const home = path.join(root, "home");
   fs.mkdirSync(home, { recursive: true });
   return home;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function readAllJsonl(dir) {

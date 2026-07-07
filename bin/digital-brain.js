@@ -53,8 +53,8 @@ async function main() {
   else if (command === "ui") runNodeRaw("lib/ui.js", argv);
   else if (command === "help" || command === "--help" || command === "-h") help();
   else if (command === "run" || command === "refresh" || command === "ingest") await runRefresh(argv, args);
-  else if (command === "doctor") doctor();
-  else if (command === "tutorial" || command === "setup-check") doctor({ tutorial: true });
+  else if (command === "doctor") doctor(argv);
+  else if (command === "tutorial" || command === "setup-check") doctor(argv, { tutorial: true });
   else if (command === "demo-proof" || command === "showcase") demoProof(argv, args);
   else if (command === "graph-ai" || command === "graph-review") runNode("lib/graph-ai.js", argv);
   else if (command === "sync-whatsapp") runPython("digital_brain_whatsapp_mac_sync.py", argv);
@@ -297,8 +297,8 @@ async function init(argv, args) {
   printSetupCheck(vault, { tutorial: true });
 }
 
-function doctor(options = {}) {
-  printSetupCheck(resolveVault(process.cwd()), options);
+function doctor(argv, options = {}) {
+  printSetupCheck(getVaultFromArgs(argv), options);
 }
 
 function runPython(script, argv) {
