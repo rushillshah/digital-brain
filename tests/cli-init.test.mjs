@@ -878,16 +878,21 @@ test("connect-repos can add repository context after init", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
   const project = path.join(root, "later-repo");
+  const secondProject = path.join(root, "another-repo");
   fs.mkdirSync(project, { recursive: true });
+  fs.mkdirSync(secondProject, { recursive: true });
   fs.writeFileSync(path.join(project, "README.md"), "# Later Repo\n\nAdded after setup.\n");
+  fs.writeFileSync(path.join(secondProject, "README.md"), "# Another Repo\n\nAdded later too.\n");
 
   run([cli, "init", vault, "--yes", "--connect-ai=false"], { HOME: testHome(root) });
   run([cli, "connect-repos", "--vault", vault, "--yes", "--input", project]);
+  run([cli, "connect-repos", "--vault", vault, "--yes", "--input", project, "--input", secondProject]);
 
   const config = readJson(path.join(vault, "digital-brain.config.json"));
   assert.ok(config.selectedSources.includes("repos"));
-  assert.deepEqual(config.repoPaths, [project]);
+  assert.deepEqual(config.repoPaths, [project, secondProject]);
   assert.match(read(path.join(vault, "06 AI Memory", "Project Context.md")), /Later Repo/);
+  assert.match(read(path.join(vault, "06 AI Memory", "Project Context.md")), /Another Repo/);
 });
 
 test("init supports GitHub CLI repository onboarding", () => {
