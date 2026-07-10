@@ -382,6 +382,7 @@ async function connectRepos(argv, args) {
   const config = readVaultConfig(vault);
   let repoPaths = parseList(args["repo-paths"] || args.repos || "");
   if (!repoPaths.length && args.input) repoPaths = Array.isArray(args.input) ? args.input : [args.input];
+  const hasExplicitRepoPaths = repoPaths.length > 0;
   if (!repoPaths.length || !toBoolean(args.yes)) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     repoPaths = await configureRepositoryContext(rl, args, repoPaths.length ? repoPaths : config.repoPaths || []);
@@ -391,6 +392,7 @@ async function connectRepos(argv, args) {
     console.log("No repositories selected.");
     return;
   }
+  if (hasExplicitRepoPaths) repoPaths = Array.from(new Set([...(config.repoPaths || []), ...repoPaths]));
   config.selectedSources = Array.from(new Set([...(config.selectedSources || []), "repos"]));
   config.repoPaths = repoPaths;
   writeConfig(vault, config);
