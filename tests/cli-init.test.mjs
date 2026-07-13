@@ -352,12 +352,13 @@ test("interpreter infers roles from conversation evidence, not just contact name
   const root = tempDir();
   const vault = path.join(root, "Brain");
   const raw = path.join(vault, "08 Sources", "WhatsApp", "Raw");
+  const timestamp = isoDaysAgo(1);
   fs.mkdirSync(raw, { recursive: true });
-  fs.writeFileSync(path.join(raw, "2026-06-09.jsonl"), [
+  fs.writeFileSync(path.join(raw, `${timestamp.slice(0, 10)}.jsonl`), [
     {
       id: "sibling-1",
       sourceSystem: "WhatsApp",
-      timestamp: "2026-06-09T10:00:00+00:00",
+      timestamp,
       chatName: "Avery",
       isGroup: false,
       fromMe: false,
@@ -367,7 +368,7 @@ test("interpreter infers roles from conversation evidence, not just contact name
     {
       id: "sibling-2",
       sourceSystem: "WhatsApp",
-      timestamp: "2026-06-09T10:01:00+00:00",
+      timestamp,
       chatName: "Avery",
       isGroup: false,
       fromMe: true,
@@ -377,7 +378,7 @@ test("interpreter infers roles from conversation evidence, not just contact name
     {
       id: "sibling-3",
       sourceSystem: "WhatsApp",
-      timestamp: "2026-06-09T10:02:00+00:00",
+      timestamp,
       chatName: "Avery",
       isGroup: false,
       fromMe: false,
@@ -404,12 +405,13 @@ test("extract writes self communication style from outbound messages", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
   const raw = path.join(vault, "08 Sources", "WhatsApp", "Raw");
+  const timestamp = isoDaysAgo(1);
   fs.mkdirSync(raw, { recursive: true });
-  fs.writeFileSync(path.join(raw, "2026-06-09.jsonl"), [
+  fs.writeFileSync(path.join(raw, `${timestamp.slice(0, 10)}.jsonl`), [
     {
       id: "friend-1",
       sourceSystem: "WhatsApp",
-      timestamp: "2026-06-09T10:00:00+00:00",
+      timestamp,
       chatName: "Close Friend",
       isGroup: false,
       fromMe: false,
@@ -419,7 +421,7 @@ test("extract writes self communication style from outbound messages", () => {
     {
       id: "me-1",
       sourceSystem: "WhatsApp",
-      timestamp: "2026-06-09T10:01:00+00:00",
+      timestamp,
       chatName: "Close Friend",
       isGroup: false,
       fromMe: true,
@@ -429,7 +431,7 @@ test("extract writes self communication style from outbound messages", () => {
     {
       id: "me-2",
       sourceSystem: "WhatsApp",
-      timestamp: "2026-06-09T10:02:00+00:00",
+      timestamp,
       chatName: "Close Friend",
       isGroup: false,
       fromMe: true,
@@ -759,10 +761,12 @@ test("gmail takeout import writes email memory", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
   const mbox = path.join(root, "mail.mbox");
+  const receivedAt = daysAgo(1);
+  const sentAt = new Date(receivedAt.getTime() + 5 * 60 * 1000);
   fs.writeFileSync(mbox, [
-    "From sender@example.com Tue Jun 09 10:00:00 2026",
+    `From sender@example.com ${receivedAt.toUTCString()}`,
     "Message-ID: <m1@example.com>",
-    "Date: Tue, 09 Jun 2026 10:00:00 +0000",
+    `Date: ${receivedAt.toUTCString()}`,
     "From: Friend <friend@example.com>",
     "To: Me <me@example.com>",
     "Subject: Re: Demo follow up",
@@ -770,9 +774,9 @@ test("gmail takeout import writes email memory", () => {
     "",
     "Can you send the demo later today?",
     "",
-    "From sender@example.com Tue Jun 09 10:05:00 2026",
+    `From sender@example.com ${sentAt.toUTCString()}`,
     "Message-ID: <m2@example.com>",
-    "Date: Tue, 09 Jun 2026 10:05:00 +0000",
+    `Date: ${sentAt.toUTCString()}`,
     "From: Me <me@example.com>",
     "To: Friend <friend@example.com>",
     "Subject: Re: Demo follow up",
@@ -914,13 +918,14 @@ test("extract skips corrupt JSONL and keeps valid records", () => {
   const root = tempDir();
   const vault = path.join(root, "Brain");
   const raw = path.join(vault, "08 Sources", "WhatsApp", "Raw");
+  const timestamp = isoDaysAgo(1);
   fs.mkdirSync(raw, { recursive: true });
-  fs.writeFileSync(path.join(raw, "2026-06-09.jsonl"), [
+  fs.writeFileSync(path.join(raw, `${timestamp.slice(0, 10)}.jsonl`), [
     "{bad json",
     JSON.stringify({
       id: "valid-1",
       sourceSystem: "WhatsApp",
-      timestamp: "2026-06-09T10:00:00+00:00",
+      timestamp,
       chatName: "Corrupt Test",
       isGroup: false,
       fromMe: true,
@@ -934,6 +939,42 @@ test("extract skips corrupt JSONL and keeps valid records", () => {
   assert.match(result.stdout, /Skipping corrupt JSONL line/);
   const profiles = readJson(path.join(vault, "08 Sources", "Analysis", "relationship_profiles.json"));
   assert.ok(profiles.some((profile) => profile.chatName === "Corrupt Test"));
+});
+
+test("extract applies the configured rolling day window", () => {
+  const root = tempDir();
+  const vault = path.join(root, "Brain");
+  const raw = path.join(vault, "08 Sources", "WhatsApp", "Raw");
+  const recentTimestamp = isoDaysAgo(29);
+  fs.mkdirSync(raw, { recursive: true });
+  fs.writeFileSync(path.join(raw, `${recentTimestamp.slice(0, 10)}.jsonl`), [
+    JSON.stringify({
+      id: "recent-window",
+      sourceSystem: "WhatsApp",
+      timestamp: recentTimestamp,
+      chatName: "Recent Window",
+      isGroup: false,
+      fromMe: false,
+      author: "Recent",
+      body: "inside the configured window",
+    }),
+    JSON.stringify({
+      id: "old-window",
+      sourceSystem: "WhatsApp",
+      timestamp: isoDaysAgo(31),
+      chatName: "Old Window",
+      isGroup: false,
+      fromMe: false,
+      author: "Old",
+      body: "outside the configured window",
+    }),
+  ].join("\n"));
+
+  run([cli, "extract", "--vault", vault, "--days", "30", "--min-messages", "1"]);
+
+  const profiles = readJson(path.join(vault, "08 Sources", "Analysis", "relationship_profiles.json"));
+  assert.ok(profiles.some((profile) => profile.chatName === "Recent Window"));
+  assert.ok(!profiles.some((profile) => profile.chatName === "Old Window"));
 });
 
 test("importers reject unsafe zip member paths", () => {
@@ -1016,6 +1057,14 @@ function readJson(file) {
 
 function tempDir() {
   return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "digital-brain-test-")));
+}
+
+function daysAgo(days) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+}
+
+function isoDaysAgo(days) {
+  return daysAgo(days).toISOString();
 }
 
 function testHome(root) {
