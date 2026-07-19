@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "../lib/args.js";
 import { copyDir, ensureDir, packageRoot, resolveVault, writeDefaultVault } from "../lib/fs.js";
 import { askCancelable, chooseInteractive } from "../lib/prompt.js";
 import { emitTelemetry, readTelemetryPreference, writeTelemetryPreference } from "../lib/telemetry.js";
@@ -1154,34 +1155,6 @@ function shell(command, args, optional = false) {
 
 function nodeMajor() {
   return Number(process.version.replace(/^v/, "").split(".")[0]);
-}
-
-function parseArgs(argv) {
-  const out = {};
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
-    const key = arg.slice(2);
-    if (key.includes("=")) {
-      const [k, ...rest] = key.split("=");
-      setArg(out, k, rest.join("="));
-    } else {
-      const next = argv[i + 1];
-      if (!next || next.startsWith("--")) setArg(out, key, true);
-      else setArg(out, key, argv[++i]);
-    }
-  }
-  return out;
-}
-
-function setArg(out, key, value) {
-  if (out[key] === undefined) {
-    out[key] = value;
-  } else if (Array.isArray(out[key])) {
-    out[key].push(value);
-  } else {
-    out[key] = [out[key], value];
-  }
 }
 
 function parseList(value) {
